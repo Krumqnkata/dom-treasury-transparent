@@ -44,6 +44,9 @@ export default function Index() {
               <Button asChild size="lg" variant="outline">
                 <Link to="/expenses">Добави разход</Link>
               </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link to="/auth">Вход за домоуправител</Link>
+              </Button>
             </div>
           </div>
           <div>

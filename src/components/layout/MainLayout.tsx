@@ -1,6 +1,9 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { PieChart, Wallet, ReceiptText, PiggyBank } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Session } from "@supabase/supabase-js";
 
 const navItems = [
   { to: "/dashboard", label: "Табло", Icon: PieChart },
@@ -10,6 +13,20 @@ const navItems = [
 ];
 
 export default function MainLayout() {
+  const [session, setSession] = useState<Session | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate("/auth", { replace: true });
+  };
+
   return (
     <div className="min-h-screen grid grid-cols-1 md:grid-cols-[240px_1fr]">
       <aside className="hidden md:flex flex-col gap-4 p-4 border-r bg-card/30">
@@ -49,9 +66,15 @@ export default function MainLayout() {
               Домова каса онлайн
             </Link>
             <div className="flex items-center gap-2">
-              <Button asChild variant="hero" size="sm">
-                <Link to="/dashboard">Отвори таблото</Link>
-              </Button>
+              {session ? (
+                <Button variant="outline" size="sm" onClick={handleSignOut}>
+                  Изход
+                </Button>
+              ) : (
+                <Button asChild variant="hero" size="sm">
+                  <Link to="/auth">Вход</Link>
+                </Button>
+              )}
             </div>
           </div>
         </header>
@@ -62,3 +85,4 @@ export default function MainLayout() {
     </div>
   );
 }
+

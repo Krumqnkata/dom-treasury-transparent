@@ -110,6 +110,17 @@ import { toast } from "@/components/ui/use-toast";
     }
   };
 
+  const removeApartment = async (apt: Apt) => {
+    try {
+      const { error } = await supabase.from("apartments").delete().eq("id", apt.id);
+      if (error) throw error;
+      setApartments((prev) => prev.filter((a) => a.id !== apt.id));
+      toast({ title: "Изтрит апартамент", description: apt.name });
+    } catch (e: any) {
+      toast({ title: "Грешка", description: e.message, variant: "destructive" });
+    }
+  };
+
   return (
     <>
       <Helmet>
@@ -153,6 +164,7 @@ import { toast } from "@/components/ui/use-toast";
                   <th className="py-2">Такса</th>
                   <th className="py-2">Платено</th>
                   <th className="py-2">Статус</th>
+                  <th className="py-2">Действия</th>
                 </tr>
               </thead>
               <tbody>
@@ -174,6 +186,9 @@ import { toast } from "@/components/ui/use-toast";
                         ) : (
                           <span className="text-destructive">Дължи {Number(r.monthly_fee)} лв.</span>
                         )}
+                      </td>
+                      <td className="py-2">
+                        <Button size="sm" variant="outline" onClick={() => removeApartment(r)}>Изтрий</Button>
                       </td>
                     </tr>
                   );

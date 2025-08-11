@@ -3,21 +3,90 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
 
-interface Expense { id: string; title: string; amount: number; category: string; date: string; image?: string }
+interface ExpenseRow { id: string; amount: number; incurred_at: string; description: string | null; receipt_path: string | null; category_id: string | null }
+interface Category { id: string; name: string }
 
 export default function Expenses() {
-  const [items, setItems] = useState<Expense[]>([]);
-  const [form, setForm] = useState<Partial<Expense>>({ category: "комунални", date: new Date().toISOString().slice(0,10) });
+  const [items, setItems] = useState<ExpenseRow[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  const today = useMemo(() => new Date().toISOString().slice(0,10), []);
+
+  const [amount, setAmount] = useState<number>(0);
+  const [date, setDate] = useState<string>(today);
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
+  const [file, setFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  const add = () => {
-    if (!form.title || !form.amount || !form.category || !form.date) return;
-    const id = Math.random().toString(36).slice(2);
-    setItems([{ id, ...(form as Expense) }, ...items]);
-    setForm({ category: form.category, date: new Date().toISOString().slice(0,10) });
-    if (fileRef.current) fileRef.current.value = "";
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [{ data: cats, error: cErr }, { data: exps, error: eErr }] = await Promise.all([
+          supabase.from("expense_categories").select("id,name").order("name"),
+          supabase.from("expenses").select("id,amount,incurred_at,description,receipt_path,category_id").order("incurred_at", { ascending: false }),
+        ]);
+        if (cErr) throw cErr;
+        if (eErr) throw eErr;
+        setCategories(cats || []);
+        setItems(exps || []);
+        if (cats && cats.length && !categoryId) setCategoryId(cats[0].id);
+      } catch (e: any) {
+        toast({ title: "Грешка", description: e.message, variant: "destructive" });
+      }
+    };
+    load();
+  }, []);
+
+  const saveExpense = async () => {
+    try {
+      if (!amount || !date) return;
+      let receipt_path: string | null = null;
+      if (file) {
+        const path = `${Date.now()}_${file.name}`;
+        const { error: upErr } = await supabase.storage.from("receipts").upload(path, file, { upsert: false });
+        if (upErr) throw upErr;
+        receipt_path = path;
+      }
+      const { data, error } = await supabase
+        .from("expenses")
+        .insert({ amount, incurred_at: date, category_id: categoryId || null, description: description || null, receipt_path })
+        .select()
+        .single();
+      if (error) throw error;
+      setItems((prev) => [data as any, ...prev]);
+      setAmount(0);
+      setDate(today);
+      setDescription("");
+      setFile(null);
+      if (fileRef.current) fileRef.current.value = "";
+      toast({ title: "Записан разход", description: `${amount.toFixed(2)} лв.` });
+    } catch (e: any) {
+      toast({ title: "Грешка", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const removeExpense = async (row: ExpenseRow) => {
+    try {
+      const { error } = await supabase.from("expenses").delete().eq("id", row.id);
+      if (error) throw error;
+      if (row.receipt_path) {
+        await supabase.storage.from("receipts").remove([row.receipt_path]);
+      }
+      setItems((prev) => prev.filter((i) => i.id !== row.id));
+    } catch (e: any) {
+      toast({ title: "Грешка при изтриване", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const publicUrl = (path: string | null) => {
+    if (!path) return null;
+    const { data } = supabase.storage.from("receipts").getPublicUrl(path);
+    return data.publicUrl;
   };
 
   return (
@@ -34,45 +103,39 @@ export default function Expenses() {
             <CardTitle>Нов разход</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            <div className="grid gap-1">
-              <label className="text-sm">Описание</label>
-              <Input value={form.title ?? ""} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
-            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1">
                 <label className="text-sm">Сума (лв.)</label>
-                <Input type="number" value={form.amount ?? ''} onChange={(e) => setForm((f) => ({ ...f, amount: Number(e.target.value) }))} />
+                <Input type="number" value={amount || ''} onChange={(e) => setAmount(Number(e.target.value || 0))} />
               </div>
               <div className="grid gap-1">
                 <label className="text-sm">Дата</label>
-                <Input type="date" value={form.date ?? ''} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
               </div>
             </div>
             <div className="grid gap-1">
               <label className="text-sm">Категория</label>
-              <Select value={form.category} onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}>
+              <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Изберете категория" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ремонти">Ремонти</SelectItem>
-                  <SelectItem value="комунални">Комунални</SelectItem>
-                  <SelectItem value="почистване">Почистване</SelectItem>
-                  <SelectItem value="извънредни">Извънредни</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="grid gap-1">
+              <label className="text-sm">Описание</label>
+              <Input value={description} onChange={(e) => setDescription(e.target.value)} />
+            </div>
+            <div className="grid gap-1">
               <label className="text-sm">Снимка на фактура/бележка</label>
-              <Input ref={fileRef} type="file" accept="image/*" onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const url = URL.createObjectURL(file);
-                setForm((f) => ({ ...f, image: url }));
-              }} />
+              <Input ref={fileRef} type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
             </div>
             <div>
-              <Button variant="hero" onClick={add}>Запази разход</Button>
+              <Button variant="hero" onClick={saveExpense}>Запази разход</Button>
             </div>
           </CardContent>
         </Card>
@@ -88,13 +151,16 @@ export default function Expenses() {
             {items.map((e) => (
               <div key={e.id} className="border rounded-md p-3 grid gap-2">
                 <div className="flex items-center justify-between">
-                  <div className="font-medium">{e.title}</div>
-                  <div className="font-semibold">{e.amount.toFixed(2)} лв.</div>
+                  <div className="font-medium">{e.description || "Разход"}</div>
+                  <div className="font-semibold">{Number(e.amount).toFixed(2)} лв.</div>
                 </div>
-                <div className="text-xs text-muted-foreground">{e.category} • {new Date(e.date).toLocaleDateString('bg-BG')}</div>
-                {e.image && (
-                  <img src={e.image} alt={`Разход: ${e.title}`} className="rounded-md max-h-48 object-cover" loading="lazy" />
+                <div className="text-xs text-muted-foreground">{new Date(e.incurred_at).toLocaleDateString('bg-BG')}</div>
+                {e.receipt_path && (
+                  <img src={publicUrl(e.receipt_path) || undefined} alt={`Разход: ${e.description || e.id}`} className="rounded-md max-h-48 object-cover" loading="lazy" />
                 )}
+                <div>
+                  <Button variant="outline" size="sm" onClick={() => removeExpense(e)}>Изтрий</Button>
+                </div>
               </div>
             ))}
           </CardContent>

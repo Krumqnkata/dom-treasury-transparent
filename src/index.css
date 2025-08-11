@@ -53,7 +53,19 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
-  }
+
+    /* Brand extensions */
+    --accent-1: 256 85% 58%;
+    --accent-2: 200 95% 54%;
+    --accent-3: 280 72% 65%;
+    --primary-glow: 222 84% 60%;
+
+    /* Gradients & shadows */
+    --gradient-hero: linear-gradient(120deg, hsl(var(--accent-1)) 0%, hsl(var(--accent-2)) 50%, hsl(var(--accent-3)) 100%);
+    --shadow-elegant: 0 12px 30px hsl(var(--accent-1) / 0.15);
+    --shadow-glow: 0 0 0 1px hsl(var(--accent-1) / 0.25), 0 10px 30px hsl(var(--accent-1) / 0.3);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+   }
 
   .dark {
     --background: 222.2 84% 4.9%;
@@ -102,4 +114,32 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@layer utilities {
+  .bg-hero {
+    background-image: var(--gradient-hero);
+  }
+  .shadow-elegant {
+    box-shadow: var(--shadow-elegant);
+  }
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+  .text-gradient {
+    background: var(--gradient-hero);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .glass-surface {
+    background-color: hsl(var(--card) / 0.6);
+    backdrop-filter: saturate(140%) blur(8px);
+    border: 1px solid hsl(var(--border) / 0.6);
+  }
+  @keyframes float {
+    0%,100% { transform: translateY(0) }
+    50% { transform: translateY(-4px) }
+  }
+  .animate-float { animation: float 4s ease-in-out infinite }
 }

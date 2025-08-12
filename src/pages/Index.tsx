@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 
+const COLORS = ["hsl(var(--accent-1))", "hsl(var(--accent-2))", "hsl(var(--accent-3))", "hsl(var(--primary))"];
+
 export default function Index() {
   const [monthlyData, setMonthlyData] = useState({
     income: 0,
@@ -15,6 +17,9 @@ export default function Index() {
     previousMonthIncome: 0,
     changePercentage: 0
   });
+  
+  const [pieData, setPieData] = useState<{ name: string; value: number }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     const fetchMonthlyData = async () => {
@@ -35,7 +40,7 @@ export default function Index() {
       // Fetch current month's expenses
       const { data: currentExpenses } = await supabase
         .from('expenses')
-        .select('amount')
+        .select('amount, category_id')
         .gte('incurred_at', currentMonthStart.toISOString().split('T')[0])
         .lte('incurred_at', currentMonthEnd.toISOString().split('T')[0]);
 
@@ -45,6 +50,11 @@ export default function Index() {
         .select('amount')
         .gte('date', prevMonthStart.toISOString().split('T')[0])
         .lte('date', prevMonthEnd.toISOString().split('T')[0]);
+
+      // Fetch categories
+      const { data: categoriesData } = await supabase
+        .from('expense_categories')
+        .select('id, name');
 
       const totalIncome = currentIncome?.reduce((sum, item) => sum + Number(item.amount), 0) || 0;
       const totalExpenses = currentExpenses?.reduce((sum, item) => sum + Number(item.amount), 0) || 0;
@@ -62,6 +72,29 @@ export default function Index() {
         previousMonthIncome: totalPrevIncome,
         changePercentage
       });
+
+      // Set categories
+      setCategories(categoriesData || []);
+
+      // Calculate pie chart data
+      if (currentExpenses && categoriesData) {
+        const expensesByCategory: Record<string, number> = {};
+        const nameById: Record<string, string> = Object.fromEntries(
+          categoriesData.map((c) => [c.id, c.name])
+        );
+        
+        currentExpenses.forEach((expense) => {
+          const categoryName = expense.category_id ? nameById[expense.category_id] || "Други" : "Други";
+          expensesByCategory[categoryName] = (expensesByCategory[categoryName] || 0) + Number(expense.amount);
+        });
+
+        const pieChartData = Object.entries(expensesByCategory).map(([name, value]) => ({
+          name,
+          value
+        }));
+
+        setPieData(pieChartData);
+      }
     };
 
     fetchMonthlyData();
@@ -145,6 +178,49 @@ export default function Index() {
           </div>
         </div>
       </section>
+      
+      {/* Expense breakdown section */}
+      {pieData.length > 0 && (
+        <section className="py-16 bg-muted/30">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold mb-4">За какво се харчат парите</h2>
+              <p className="text-muted-foreground">Разбивка на разходите за текущия месец</p>
+            </div>
+            <div className="max-w-2xl mx-auto">
+              <Card className="glass-surface">
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    {pieData.map((item, index) => {
+                      const percentage = monthlyData.expenses > 0 ? (item.value / monthlyData.expenses) * 100 : 0;
+                      return (
+                        <div key={item.name} className="flex items-center justify-between p-3 bg-background/50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className="w-4 h-4 rounded-full" 
+                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                            />
+                            <span className="font-medium">{item.name}</span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-sm text-muted-foreground">{percentage.toFixed(1)}%</span>
+                            <span className="font-semibold">{item.value.toFixed(2)} лв.</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-6 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      Общо разходи за месеца: <span className="font-semibold">{monthlyData.expenses.toFixed(2)} лв.</span>
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+      )}
     </>
   );
 }

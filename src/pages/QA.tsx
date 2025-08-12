@@ -10,8 +10,7 @@ export default function QA() {
   const [goalId, setGoalId] = useState<string | null>(null);
   const [expenseId, setExpenseId] = useState<string | null>(null);
   const [receiptPath, setReceiptPath] = useState<string | null>(null);
-  const [apartmentId, setApartmentId] = useState<string | null>(null);
-  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [dailyCashId, setDailyCashId] = useState<string | null>(null);
 
   const [logs, setLogs] = useState<string[]>([]);
   const log = (m: string) => {
@@ -183,52 +182,36 @@ const { error: upErr } = await (supabase as any)
     }
   };
 
-  // Apartments & Payments suite
-  const runAptPayments = async () => {
+  // Daily Cash suite
+  const runDailyCash = async () => {
     try {
-      log("Apartments: insert QA Apt 101");
-      const { data: apt, error: aptErr } = await supabase
-        .from("apartments")
-        .insert({ name: "QA Apt 101", monthly_fee: 50, active: true })
+      log("Daily Cash: insert test entry");
+      const { data: cash, error: cashErr } = await supabase
+        .from("daily_cash")
+        .insert({ amount: 100, date: monthStart, notes: "QA Test Entry" })
         .select("id")
         .single();
-      if (aptErr) throw aptErr;
-      setApartmentId(apt.id);
-      log(`Apartments: inserted id=${apt.id}`);
+      if (cashErr) throw cashErr;
+      setDailyCashId(cash.id);
+      log(`Daily Cash: inserted id=${cash.id}`);
 
-      log("Payments: insert for current month");
-      const { data: pay, error: payErr } = await supabase
-        .from("payments")
-        .insert({ apartment_id: apt.id, amount: 50, period_month: monthStart, method: "cash", notes: "QA" })
-        .select("id")
-        .single();
-      if (payErr) throw payErr;
-      setPaymentId(pay.id);
-      log(`Payments: inserted id=${pay.id}`);
-
-      toast({ title: "Apartments & Payments OK", description: "Добавени успешно" });
+      toast({ title: "Daily Cash OK", description: "Добавен успешно" });
     } catch (e: any) {
       console.error(e);
-      toast({ title: "Apt/Payments error", description: e.message, variant: "destructive" });
-      log(`Apt/Payments error: ${e.message}`);
+      toast({ title: "Daily Cash error", description: e.message, variant: "destructive" });
+      log(`Daily Cash error: ${e.message}`);
     }
   };
 
-  const cleanupAptPayments = async () => {
+  const cleanupDailyCash = async () => {
     try {
-      if (paymentId) {
-        const { error } = await supabase.from("payments").delete().eq("id", paymentId);
+      if (dailyCashId) {
+        const { error } = await supabase.from("daily_cash").delete().eq("id", dailyCashId);
         if (error) throw error;
-        log(`Payments: deleted id=${paymentId}`);
-        setPaymentId(null);
+        log(`Daily Cash: deleted id=${dailyCashId}`);
+        setDailyCashId(null);
       }
-      if (apartmentId) {
-        const { error: delApt } = await supabase.from("apartments").delete().eq("id", apartmentId);
-        if (delApt) throw delApt;
-        log(`Apartments: deleted id=${apartmentId}`);
-        setApartmentId(null);
-      }
-      toast({ title: "Apt/Payments cleanup", description: "Почистено" });
+      toast({ title: "Daily Cash cleanup", description: "Почистено" });
     } catch (e: any) {
       toast({ title: "Cleanup error", description: e.message, variant: "destructive" });
     }
@@ -269,10 +252,10 @@ const { error: upErr } = await (supabase as any)
               </div>
             </section>
             <section>
-              <h2 className="text-lg font-semibold mb-2">Apartments & Payments</h2>
+              <h2 className="text-lg font-semibold mb-2">Daily Cash</h2>
               <div className="flex flex-wrap gap-2">
-                <Button variant="hero" onClick={runAptPayments}>Run</Button>
-                <Button variant="outline" onClick={cleanupAptPayments} disabled={!apartmentId && !paymentId}>Clean up</Button>
+                <Button variant="hero" onClick={runDailyCash}>Run</Button>
+                <Button variant="outline" onClick={cleanupDailyCash} disabled={!dailyCashId}>Clean up</Button>
               </div>
             </section>
             <section>

@@ -8,7 +8,7 @@ import { toast } from "@/components/ui/use-toast";
 const COLORS = ["hsl(var(--accent-1))", "hsl(var(--accent-2))", "hsl(var(--accent-3))", "hsl(var(--primary))"]; 
 
 type Expense = { id: string; amount: number; incurred_at: string; category_id: string | null };
-type Payment = { id: string; amount: number; period_month: string };
+type DailyCash = { id: string; amount: number; date: string };
 type Category = { id: string; name: string };
 
 function monthKey(d: Date) {
@@ -16,7 +16,7 @@ function monthKey(d: Date) {
 }
 
 export default function Dashboard() {
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [dailyCash, setDailyCash] = useState<DailyCash[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
 
@@ -40,13 +40,13 @@ export default function Dashboard() {
     const load = async () => {
       try {
         setLoading(true);
-        const [{ data: pays, error: pErr }, { data: exps, error: eErr }, { data: cats, error: cErr }] = await Promise.all([
-          supabase.from("payments").select("id,amount,period_month").gte("period_month", startIso),
+        const [{ data: cash, error: cErr }, { data: exps, error: eErr }, { data: cats, error: catErr }] = await Promise.all([
+          supabase.from("daily_cash").select("id,amount,date").gte("date", startIso),
           supabase.from("expenses").select("id,amount,incurred_at,category_id").gte("incurred_at", startIso),
           supabase.from("expense_categories").select("id,name"),
         ]);
-        if (pErr) throw pErr; if (eErr) throw eErr; if (cErr) throw cErr;
-        setPayments(pays || []);
+        if (cErr) throw cErr; if (eErr) throw eErr; if (catErr) throw catErr;
+        setDailyCash(cash || []);
         setExpenses(exps || []);
         setCategories(cats || []);
       } catch (e: any) {
@@ -62,10 +62,10 @@ export default function Dashboard() {
     const income: Record<string, number> = {};
     const expense: Record<string, number> = {};
     months.forEach((m) => { income[m.key] = 0; expense[m.key] = 0; });
-    payments.forEach((p) => { const k = p.period_month.slice(0, 7); if (k in income) income[k] += Number(p.amount); });
+    dailyCash.forEach((c) => { const k = c.date.slice(0, 7); if (k in income) income[k] += Number(c.amount); });
     expenses.forEach((x) => { const k = x.incurred_at.slice(0, 7); if (k in expense) expense[k] += Number(x.amount); });
     return months.map((m) => ({ month: m.label, income: income[m.key], expense: expense[m.key] }));
-  }, [payments, expenses, months]);
+  }, [dailyCash, expenses, months]);
 
   const currentKey = months[months.length - 1].key;
   const currentIncome = sumsByMonth[sumsByMonth.length - 1]?.income || 0;

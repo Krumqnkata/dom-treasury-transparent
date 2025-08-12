@@ -15,6 +15,8 @@ import Auth from "./pages/Auth";
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import QA from "./pages/QA";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +29,11 @@ function RequireAuth({ children }: { children: JSX.Element }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setLoading(false);
+      if (!s) {
+        setTimeout(() => {
+          toast({ title: "Сесията изтече", description: "Моля, влезте отново." });
+        }, 0);
+      }
     });
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -56,6 +63,7 @@ const App = () => (
               <Route path="/incomes" element={<Incomes />} />
               <Route path="/expenses" element={<Expenses />} />
               <Route path="/goals" element={<Goals />} />
+              <Route path="/qa" element={<QA />} />
             </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

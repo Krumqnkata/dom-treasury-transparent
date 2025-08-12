@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Edit2, Check, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
@@ -22,6 +23,13 @@ export default function Expenses() {
   const [description, setDescription] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  // Edit state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState<number>(0);
+  const [editDate, setEditDate] = useState<string>("");
+  const [editCategoryId, setEditCategoryId] = useState<string>("");
+  const [editDescription, setEditDescription] = useState<string>("");
 
   useEffect(() => {
     const load = async () => {
@@ -80,6 +88,51 @@ export default function Expenses() {
       setItems((prev) => prev.filter((i) => i.id !== row.id));
     } catch (e: any) {
       toast({ title: "Грешка при изтриване", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const startEdit = (expense: ExpenseRow) => {
+    setEditingId(expense.id);
+    setEditAmount(expense.amount);
+    setEditDate(expense.incurred_at);
+    setEditCategoryId(expense.category_id || "");
+    setEditDescription(expense.description || "");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditAmount(0);
+    setEditDate("");
+    setEditCategoryId("");
+    setEditDescription("");
+  };
+
+  const saveEdit = async () => {
+    try {
+      if (!editingId || !editAmount || !editDate) return;
+      
+      const { data, error } = await supabase
+        .from("expenses")
+        .update({ 
+          amount: editAmount, 
+          incurred_at: editDate, 
+          category_id: editCategoryId || null, 
+          description: editDescription || null 
+        })
+        .eq("id", editingId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      setItems((prev) => prev.map((item) => 
+        item.id === editingId ? { ...item, ...data } : item
+      ));
+      
+      cancelEdit();
+      toast({ title: "Разходът е обновен", description: `${editAmount.toFixed(2)} лв.` });
+    } catch (e: any) {
+      toast({ title: "Грешка при редактиране", description: e.message, variant: "destructive" });
     }
   };
 
@@ -150,17 +203,92 @@ export default function Expenses() {
             )}
             {items.map((e) => (
               <div key={e.id} className="border rounded-md p-3 grid gap-2">
-                <div className="flex items-center justify-between">
-                  <div className="font-medium">{e.description || "Разход"}</div>
-                  <div className="font-semibold">{Number(e.amount).toFixed(2)} лв.</div>
-                </div>
-                <div className="text-xs text-muted-foreground">{new Date(e.incurred_at).toLocaleDateString('bg-BG')}</div>
-                {e.receipt_path && (
-                  <img src={publicUrl(e.receipt_path) || undefined} alt={`Разход: ${e.description || e.id}`} className="rounded-md max-h-48 object-cover" loading="lazy" />
+                {editingId === e.id ? (
+                  // Edit mode
+                  <div className="grid gap-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="grid gap-1">
+                        <label className="text-sm">Сума (лв.)</label>
+                        <Input 
+                          type="number" 
+                          value={editAmount || ''} 
+                          onChange={(e) => setEditAmount(Number(e.target.value || 0))} 
+                        />
+                      </div>
+                      <div className="grid gap-1">
+                        <label className="text-sm">Дата</label>
+                        <Input 
+                          type="date" 
+                          value={editDate} 
+                          onChange={(e) => setEditDate(e.target.value)} 
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-sm">Категория</label>
+                      <Select value={editCategoryId} onValueChange={setEditCategoryId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Изберете категория" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-sm">Описание</label>
+                      <Input 
+                        value={editDescription} 
+                        onChange={(e) => setEditDescription(e.target.value)} 
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={saveEdit}>
+                        <Check className="size-4 mr-1" />
+                        Запази
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={cancelEdit}>
+                        <X className="size-4 mr-1" />
+                        Отказ
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  // View mode
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">{e.description || "Разход"}</div>
+                      <div className="font-semibold">{Number(e.amount).toFixed(2)} лв.</div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(e.incurred_at).toLocaleDateString('bg-BG')}
+                      {e.category_id && (
+                        <span className="ml-2 text-muted-foreground">
+                          • {categories.find(c => c.id === e.category_id)?.name}
+                        </span>
+                      )}
+                    </div>
+                    {e.receipt_path && (
+                      <img 
+                        src={publicUrl(e.receipt_path) || undefined} 
+                        alt={`Разход: ${e.description || e.id}`} 
+                        className="rounded-md max-h-48 object-cover" 
+                        loading="lazy" 
+                      />
+                    )}
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => startEdit(e)}>
+                        <Edit2 className="size-4 mr-1" />
+                        Редактирай
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => removeExpense(e)}>
+                        Изтрий
+                      </Button>
+                    </div>
+                  </>
                 )}
-                <div>
-                  <Button variant="outline" size="sm" onClick={() => removeExpense(e)}>Изтрий</Button>
-                </div>
               </div>
             ))}
           </CardContent>

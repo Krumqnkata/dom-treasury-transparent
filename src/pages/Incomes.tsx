@@ -1,213 +1,268 @@
+import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useEffect, useMemo, useState } from "react";
-import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
+import { Trash2, CalendarDays } from "lucide-react";
 
- type Apt = { id: string; name: string; monthly_fee: number; active: boolean };
- type Payment = { id: string; apartment_id: string; amount: number };
+interface DailyCash {
+  id: string;
+  date: string;
+  amount: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
 
- export default function Incomes() {
-  const [apartments, setApartments] = useState<Apt[]>([]);
-  const [payments, setPayments] = useState<Record<string, Payment>>({});
-  const [month, setMonth] = useState<string>(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
-  const [newName, setNewName] = useState("");
-  const [newFee, setNewFee] = useState<number>(35);
-  const monthDate = useMemo(() => new Date(`${month}-01T00:00:00`), [month]);
-  const monthISO = useMemo(() => `${month}-01`, [month]);
+export default function Incomes() {
+  const [dailyCash, setDailyCash] = useState<DailyCash[]>([]);
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [amount, setAmount] = useState("");
+  const [notes, setNotes] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const fetchDailyCash = async () => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from("daily_cash")
+        .select("*")
+        .order("date", { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      setDailyCash(data || []);
+    } catch (err: any) {
+      console.error("Error fetching daily cash:", err);
+      toast({ title: "Грешка", description: "Неуспешно зареждане на записите", variant: "destructive" });
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      const { data: apts, error: aErr } = await supabase
-        .from("apartments")
-        .select("id,name,monthly_fee,active")
-        .order("name");
-      if (aErr) {
-        toast({ title: "Грешка", description: aErr.message, variant: "destructive" });
-        return;
-      }
-      setApartments(apts || []);
+    fetchDailyCash();
+  }, []);
 
-      const { data: pays, error: pErr } = await supabase
-        .from("payments")
-        .select("id,apartment_id,amount")
-        .eq("period_month", monthISO);
-      if (pErr) {
-        toast({ title: "Грешка", description: pErr.message, variant: "destructive" });
-        return;
-      }
-      const map: Record<string, Payment> = {};
-      (pays || []).forEach((p) => (map[p.apartment_id] = p as any));
-      setPayments(map);
-    };
-    load();
-  }, [monthISO]);
-
-  const total = apartments.reduce((s, r) => s + Number(r.monthly_fee || 0), 0);
-  const collected = apartments.reduce((s, r) => s + (payments[r.id] ? Number(r.monthly_fee) : 0), 0);
-  const progress = total ? Math.round((collected / total) * 100) : 0;
-
-  const togglePaid = async (apt: Apt, next: boolean) => {
-    try {
-      if (next) {
-        const { data, error } = await supabase
-          .from("payments")
-          .upsert(
-            [
-              {
-                apartment_id: apt.id,
-                period_month: monthISO,
-                amount: apt.monthly_fee,
-              },
-            ],
-            { onConflict: "apartment_id,period_month" }
-          )
-          .select()
-          .maybeSingle();
-        if (error) throw error;
-        setPayments((prev) => ({ ...prev, [apt.id]: data as any }));
-      } else {
-        const { error } = await supabase
-          .from("payments")
-          .delete()
-          .eq("apartment_id", apt.id)
-          .eq("period_month", monthISO);
-        if (error) throw error;
-        setPayments((prev) => {
-          const cp = { ...prev };
-          delete cp[apt.id];
-          return cp;
-        });
-      }
-    } catch (e: any) {
-      toast({ title: "Грешка", description: e.message, variant: "destructive" });
-    }
-  };
-
-  const addApartment = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!amount.trim()) {
+      toast({ title: "Грешка", description: "Въведете сума", variant: "destructive" });
+      return;
+    }
+
     try {
-      const { data, error } = await supabase
-        .from("apartments")
-        .insert({ name: newName, monthly_fee: newFee, active: true })
-        .select()
-        .single();
-      if (error) throw error;
-      setApartments((prev) => [...prev, data as any]);
-      setNewName("");
-      setNewFee(35);
-      toast({ title: "Добавен апартамент", description: newName });
-    } catch (e: any) {
-      toast({ title: "Грешка", description: e.message, variant: "destructive" });
+      const amountNum = parseFloat(amount);
+      if (isNaN(amountNum)) {
+        toast({ title: "Грешка", description: "Невалидна сума", variant: "destructive" });
+        return;
+      }
+
+      if (editingId) {
+        // Update existing record
+        const { error } = await (supabase as any)
+          .from("daily_cash")
+          .update({
+            date,
+            amount: amountNum,
+            notes: notes.trim() || null,
+          })
+          .eq("id", editingId);
+
+        if (error) throw error;
+        toast({ title: "Успех", description: "Записът е обновен" });
+        setEditingId(null);
+      } else {
+        // Insert new record
+        const { error } = await (supabase as any)
+          .from("daily_cash")
+          .insert({
+            date,
+            amount: amountNum,
+            notes: notes.trim() || null,
+          });
+
+        if (error) throw error;
+        toast({ title: "Успех", description: "Записът е добавен" });
+      }
+
+      // Reset form
+      setDate(new Date().toISOString().slice(0, 10));
+      setAmount("");
+      setNotes("");
+      fetchDailyCash();
+    } catch (err: any) {
+      console.error("Error saving daily cash:", err);
+      toast({ 
+        title: "Грешка", 
+        description: err.message.includes("duplicate") ? "Запис за тази дата вече съществува" : "Неуспешно запазване на записа", 
+        variant: "destructive" 
+      });
     }
   };
 
-  const removeApartment = async (apt: Apt) => {
+  const handleEdit = (record: DailyCash) => {
+    setEditingId(record.id);
+    setDate(record.date);
+    setAmount(record.amount.toString());
+    setNotes(record.notes || "");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setDate(new Date().toISOString().slice(0, 10));
+    setAmount("");
+    setNotes("");
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Сигурни ли сте, че искате да изтриете този запис?")) return;
+
     try {
-      const { error } = await supabase.from("apartments").delete().eq("id", apt.id);
+      const { error } = await (supabase as any)
+        .from("daily_cash")
+        .delete()
+        .eq("id", id);
+
       if (error) throw error;
-      setApartments((prev) => prev.filter((a) => a.id !== apt.id));
-      toast({ title: "Изтрит апартамент", description: apt.name });
-    } catch (e: any) {
-      toast({ title: "Грешка", description: e.message, variant: "destructive" });
+      toast({ title: "Успех", description: "Записът е изтрит" });
+      fetchDailyCash();
+    } catch (err: any) {
+      console.error("Error deleting daily cash:", err);
+      toast({ title: "Грешка", description: "Неуспешно изтриване на записа", variant: "destructive" });
     }
   };
+
+  const totalCurrentMonth = dailyCash
+    .filter(record => {
+      const recordMonth = new Date(record.date).getMonth();
+      const currentMonth = new Date().getMonth();
+      return recordMonth === currentMonth;
+    })
+    .reduce((sum, record) => sum + record.amount, 0);
 
   return (
     <>
       <Helmet>
-        <title>Приходи – Домова каса онлайн</title>
-        <meta name="description" content="Въвеждане и проследяване на месечни такси по апартаменти." />
+        <title>Ежедневни приходи – Домова каса онлайн</title>
+        <meta name="description" content="Записвайте ежедневно наличните пари в касата за прозрачно проследяване на финансите." />
         <link rel="canonical" href="/incomes" />
       </Helmet>
-
-      <Card className="glass-surface">
-        <CardHeader>
-          <CardTitle>Месечни такси</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="grid md:grid-cols-3 gap-3">
-            <div className="grid gap-1">
-              <Label htmlFor="month">Месец</Label>
-              <Input id="month" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-            </div>
-            <form className="grid gap-1 md:col-span-2" onSubmit={addApartment}>
-              <div className="grid md:grid-cols-3 gap-3">
-                <div className="grid gap-1">
-                  <Label htmlFor="name">Нов апартамент</Label>
-                  <Input id="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ап. 1" />
+      
+      <div className="grid gap-6">
+        <Card className="glass-surface">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays />
+              {editingId ? "Редактиране на запис" : "Добавяне на ежедневен запис"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="grid gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="date">Дата</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    required
+                  />
                 </div>
-                <div className="grid gap-1">
-                  <Label htmlFor="fee">Месечна такса (лв.)</Label>
-                  <Input id="fee" type="number" value={newFee} onChange={(e) => setNewFee(Number(e.target.value || 0))} />
-                </div>
-                <div className="flex items-end">
-                  <Button type="submit" variant="outline">Добави</Button>
+                <div>
+                  <Label htmlFor="amount">Налични пари (лв.)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    required
+                  />
                 </div>
               </div>
+              <div>
+                <Label htmlFor="notes">Бележки (по избор)</Label>
+                <Textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Допълнителна информация..."
+                  rows={3}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" variant="hero">
+                  {editingId ? "Обнови запис" : "Добави запис"}
+                </Button>
+                {editingId && (
+                  <Button type="button" variant="outline" onClick={handleCancelEdit}>
+                    Отказ
+                  </Button>
+                )}
+              </div>
             </form>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-muted-foreground">
-                  <th className="py-2">Апартамент</th>
-                  <th className="py-2">Такса</th>
-                  <th className="py-2">Платено</th>
-                  <th className="py-2">Статус</th>
-                  <th className="py-2">Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {apartments.map((r) => {
-                  const paid = Boolean(payments[r.id]);
-                  return (
-                    <tr key={r.id} className="border-t">
-                      <td className="py-2">{r.name}</td>
-                      <td className="py-2">{Number(r.monthly_fee)} лв.</td>
-                      <td className="py-2">
-                        <Checkbox
-                          checked={paid}
-                          onCheckedChange={(v) => togglePaid(r, Boolean(v))}
-                        />
-                      </td>
-                      <td className="py-2">
-                        {paid ? (
-                          <span className="text-primary">Дал {Number(r.monthly_fee)} лв.</span>
-                        ) : (
-                          <span className="text-destructive">Дължи {Number(r.monthly_fee)} лв.</span>
-                        )}
-                      </td>
-                      <td className="py-2">
-                        <Button size="sm" variant="outline" onClick={() => removeApartment(r)}>Изтрий</Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-6 grid gap-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Събрано</span>
-              <span className="font-medium">
-                {collected} / {total} лв. ({progress}%)
-              </span>
+        <Card className="glass-surface">
+          <CardHeader>
+            <CardTitle>Последни записи</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 p-4 bg-accent/50 rounded-lg">
+              <div className="text-sm text-muted-foreground">Общо за текущия месец</div>
+              <div className="text-2xl font-semibold">{totalCurrentMonth.toFixed(2)} лв.</div>
             </div>
-            <Progress value={progress} />
-          </div>
-        </CardContent>
-      </Card>
+            
+            {dailyCash.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                Няма записи. Добавете първия си запис за днес.
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {dailyCash.map((record) => (
+                  <div key={record.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-4">
+                        <div className="text-sm text-muted-foreground">
+                          {new Date(record.date).toLocaleDateString("bg-BG")}
+                        </div>
+                        <div className="font-semibold text-lg">
+                          {record.amount.toFixed(2)} лв.
+                        </div>
+                      </div>
+                      {record.notes && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {record.notes}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(record)}
+                      >
+                        Редактирай
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(record.id)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </>
   );
 }

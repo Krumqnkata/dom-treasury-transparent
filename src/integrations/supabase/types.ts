@@ -14,33 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      apartments: {
-        Row: {
-          active: boolean
-          created_at: string
-          id: string
-          monthly_fee: number
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          active?: boolean
-          created_at?: string
-          id?: string
-          monthly_fee?: number
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          active?: boolean
-          created_at?: string
-          id?: string
-          monthly_fee?: number
-          name?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       budgets: {
         Row: {
           amount: number
@@ -180,50 +153,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      payments: {
-        Row: {
-          amount: number
-          apartment_id: string
-          created_at: string
-          id: string
-          method: string | null
-          notes: string | null
-          paid_at: string
-          period_month: string
-          updated_at: string
-        }
-        Insert: {
-          amount: number
-          apartment_id: string
-          created_at?: string
-          id?: string
-          method?: string | null
-          notes?: string | null
-          paid_at?: string
-          period_month: string
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          apartment_id?: string
-          created_at?: string
-          id?: string
-          method?: string | null
-          notes?: string | null
-          paid_at?: string
-          period_month?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payments_apartment_id_fkey"
-            columns: ["apartment_id"]
-            isOneToOne: false
-            referencedRelation: "apartments"
-            referencedColumns: ["id"]
-          },
-        ]
       }
     }
     Views: {

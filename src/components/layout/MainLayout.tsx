@@ -7,7 +7,6 @@ import type { Session } from "@supabase/supabase-js";
 
 const navItems = [
   { to: "/dashboard", label: "Табло", Icon: PieChart },
-  { to: "/incomes", label: "Приходи", Icon: Wallet },
   { to: "/expenses", label: "Разходи", Icon: ReceiptText },
   { to: "/goals", label: "Цели", Icon: PiggyBank },
 ];

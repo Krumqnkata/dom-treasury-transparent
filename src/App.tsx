@@ -7,7 +7,7 @@ import { HelmetProvider } from "react-helmet-async";
 import MainLayout from "./components/layout/MainLayout";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
-import Incomes from "./pages/Incomes";
+
 import Expenses from "./pages/Expenses";
 import Goals from "./pages/Goals";
 import NotFound from "./pages/NotFound";
@@ -60,7 +60,6 @@ const App = () => (
 
             <Route element={<RequireAuth><MainLayout /></RequireAuth>}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/incomes" element={<Incomes />} />
               <Route path="/expenses" element={<Expenses />} />
               <Route path="/goals" element={<Goals />} />
               <Route path="/qa" element={<QA />} />

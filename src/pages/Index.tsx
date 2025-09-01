@@ -5,7 +5,10 @@ import { PieChart as PieIcon, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfMonth, endOfMonth } from "date-fns";
+import { startOfMonth, endOfMonth, format } from "date-fns";
+import { bg } from "date-fns/locale";
+import { DateRange } from "react-day-picker";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 
 const COLORS = ["hsl(var(--accent-1))", "hsl(var(--accent-2))", "hsl(var(--accent-3))", "hsl(var(--primary))"];
 
@@ -13,19 +16,24 @@ export default function Index() {
   const [monthlyExpenses, setMonthlyExpenses] = useState(0);
   const [pieData, setPieData] = useState<{ name: string; value: number }[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const today = new Date();
+    return {
+      from: startOfMonth(today),
+      to: endOfMonth(today)
+    };
+  });
 
   useEffect(() => {
     const fetchMonthlyData = async () => {
-      const currentDate = new Date();
-      const currentMonthStart = startOfMonth(currentDate);
-      const currentMonthEnd = endOfMonth(currentDate);
+      if (!dateRange?.from || !dateRange?.to) return;
 
-      // Fetch current month's expenses
+      // Fetch expenses for selected period
       const { data: currentExpenses } = await supabase
         .from('expenses')
         .select('amount, category_id')
-        .gte('incurred_at', currentMonthStart.toISOString().split('T')[0])
-        .lte('incurred_at', currentMonthEnd.toISOString().split('T')[0]);
+        .gte('incurred_at', dateRange.from.toISOString().split('T')[0])
+        .lte('incurred_at', dateRange.to.toISOString().split('T')[0]);
 
       // Fetch categories
       const { data: categoriesData } = await supabase
@@ -61,7 +69,7 @@ export default function Index() {
     };
 
     fetchMonthlyData();
-  }, []);
+  }, [dateRange]);
 
   return (
     <>
@@ -112,8 +120,19 @@ export default function Index() {
       <section className="py-16 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">Месечни разходи</h2>
-            <p className="text-muted-foreground">Обобщение на разходите за текущия месец</p>
+            <h2 className="text-3xl font-bold mb-4">Разходи по период</h2>
+            <p className="text-muted-foreground">
+              {dateRange?.from && dateRange?.to ? 
+                `Разходи от ${format(dateRange.from, "dd.MM.yyyy", { locale: bg })} до ${format(dateRange.to, "dd.MM.yyyy", { locale: bg })}` :
+                "Изберете период за преглед на разходите"
+              }
+            </p>
+          </div>
+          <div className="flex justify-center mb-8">
+            <DateRangePicker 
+              dateRange={dateRange} 
+              onDateRangeChange={setDateRange}
+            />
           </div>
           <div className="max-w-2xl mx-auto">
             <Card className="glass-surface">
@@ -130,11 +149,16 @@ export default function Index() {
       
       {/* Expense breakdown section */}
       {pieData.length > 0 && (
-        <section className="py-16 bg-muted/30">
+        <section className="py-16">
           <div className="container mx-auto px-4">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold mb-4">За какво се харчат парите</h2>
-              <p className="text-muted-foreground">Разбивка на разходите за текущия месец</p>
+              <p className="text-muted-foreground">
+                {dateRange?.from && dateRange?.to ? 
+                  `Разбивка на разходите от ${format(dateRange.from, "dd.MM.yyyy", { locale: bg })} до ${format(dateRange.to, "dd.MM.yyyy", { locale: bg })}` :
+                  "Разбивка на разходите за избрания период"
+                }
+              </p>
             </div>
             <div className="max-w-2xl mx-auto">
               <Card className="glass-surface">
@@ -161,7 +185,7 @@ export default function Index() {
                   </div>
                   <div className="mt-6 text-center">
                     <p className="text-sm text-muted-foreground">
-                      Общо разходи за месеца: <span className="font-semibold">{monthlyExpenses.toFixed(2)} лв.</span>
+                      Общо разходи за периода: <span className="font-semibold">{monthlyExpenses.toFixed(2)} лв.</span>
                     </p>
                   </div>
                 </CardContent>

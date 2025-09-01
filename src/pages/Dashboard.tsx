@@ -4,6 +4,10 @@ import { Pie, PieChart as RPieChart, Cell, Tooltip as RTooltip, ResponsiveContai
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import { startOfMonth, endOfMonth, format } from "date-fns";
+import { bg } from "date-fns/locale";
+import { DateRange } from "react-day-picker";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 
 const COLORS = ["hsl(var(--accent-1))", "hsl(var(--accent-2))", "hsl(var(--accent-3))", "hsl(var(--primary))"]; 
 
@@ -14,16 +18,24 @@ export default function Dashboard() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const currentDate = new Date();
-  const currentKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`;
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const today = new Date();
+    return {
+      from: startOfMonth(today),
+      to: endOfMonth(today)
+    };
+  });
 
   useEffect(() => {
     const load = async () => {
+      if (!dateRange?.from || !dateRange?.to) return;
+      
       try {
         setLoading(true);
         const [{ data: exps, error: eErr }, { data: cats, error: catErr }] = await Promise.all([
-          supabase.from("expenses").select("id,amount,incurred_at,category_id").gte("incurred_at", `${currentKey}-01`),
+          supabase.from("expenses").select("id,amount,incurred_at,category_id")
+            .gte("incurred_at", dateRange.from.toISOString().split('T')[0])
+            .lte("incurred_at", dateRange.to.toISOString().split('T')[0]),
           supabase.from("expense_categories").select("id,name"),
         ]);
         if (eErr) throw eErr; if (catErr) throw catErr;
@@ -36,22 +48,21 @@ export default function Dashboard() {
       }
     };
     load();
-  }, [currentKey]);
+  }, [dateRange]);
 
   const currentExpense = useMemo(() => {
-    return expenses.filter((x) => x.incurred_at.startsWith(currentKey))
-      .reduce((sum, x) => sum + Number(x.amount), 0);
-  }, [expenses, currentKey]);
+    return expenses.reduce((sum, x) => sum + Number(x.amount), 0);
+  }, [expenses]);
 
   const pieData = useMemo(() => {
     const map: Record<string, number> = {};
     const nameById: Record<string, string> = Object.fromEntries(categories.map((c) => [c.id, c.name]));
-    expenses.filter((x) => x.incurred_at.startsWith(currentKey)).forEach((x) => {
+    expenses.forEach((x) => {
       const key = x.category_id ? nameById[x.category_id] || "Други" : "Други";
       map[key] = (map[key] || 0) + Number(x.amount);
     });
     return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [expenses, categories, currentKey]);
+  }, [expenses, categories]);
 
   return (
     <>
@@ -61,14 +72,34 @@ export default function Dashboard() {
         <link rel="canonical" href="/dashboard" />
       </Helmet>
 
+      {/* Period selector */}
+      <div className="flex justify-center mb-8">
+        <DateRangePicker 
+          dateRange={dateRange} 
+          onDateRangeChange={setDateRange}
+        />
+      </div>
+
       <div className="grid gap-4 md:grid-cols-1 max-w-md">
-        <StatCard title="Месечни разходи" value={`${currentExpense.toFixed(2)} лв.`} trend="" />
+        <StatCard 
+          title={`Разходи за периода ${dateRange?.from && dateRange?.to ? 
+            `(${format(dateRange.from, "dd.MM.yyyy", { locale: bg })} - ${format(dateRange.to, "dd.MM.yyyy", { locale: bg })})` : 
+            ""
+          }`} 
+          value={`${currentExpense.toFixed(2)} лв.`} 
+          trend="" 
+        />
       </div>
 
       <div className="mt-6 max-w-2xl">
         <Card className="glass-surface">
           <CardHeader>
-            <CardTitle>За какво се харчат парите (текущ месец)</CardTitle>
+            <CardTitle>
+              За какво се харчат парите {dateRange?.from && dateRange?.to ? 
+                `(${format(dateRange.from, "dd.MM.yyyy", { locale: bg })} - ${format(dateRange.to, "dd.MM.yyyy", { locale: bg })})` : 
+                ""
+              }
+            </CardTitle>
           </CardHeader>
           <CardContent className="h-96">
             {pieData.length > 0 ? (
@@ -85,7 +116,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                Няма данни за разходи този месец
+                Няма данни за разходи за избрания период
               </div>
             )}
           </CardContent>

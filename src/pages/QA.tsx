@@ -29,10 +29,17 @@ export default function QA() {
   const runBudgets = async () => {
     try {
       setLogs([]);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "Грешка", description: "Трябва да сте влезли в профила си", variant: "destructive" });
+        return;
+      }
+
       log("Budgets: insert 123.45");
-const { data: ins, error } = await (supabase as any)
+      const { data: ins, error } = await supabase
         .from("budgets")
-        .insert({ amount: 123.45, note: "QA" })
+        .insert({ amount: 123.45, note: "QA", user_id: user.id })
         .select("id")
         .single();
       if (error) throw error;
@@ -40,7 +47,7 @@ const { data: ins, error } = await (supabase as any)
       log(`Budgets: inserted id=${ins.id}`);
 
       log("Budgets: update to 200");
-const { error: upErr } = await (supabase as any)
+      const { error: upErr } = await supabase
         .from("budgets")
         .update({ amount: 200 })
         .eq("id", ins.id);
@@ -57,7 +64,7 @@ const { error: upErr } = await (supabase as any)
   const cleanupBudgets = async () => {
     if (!budgetId) return;
     try {
-      const { error } = await (supabase as any).from("budgets").delete().eq("id", budgetId);
+      const { error } = await supabase.from("budgets").delete().eq("id", budgetId);
       if (error) throw error;
       log(`Budgets: deleted id=${budgetId}`);
       setBudgetId(null);
@@ -70,10 +77,16 @@ const { error: upErr } = await (supabase as any)
   // Goals suite
   const runGoals = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "Грешка", description: "Трябва да сте влезли в профила си", variant: "destructive" });
+        return;
+      }
+
       log("Goals: insert QA Goal");
       const { data: ins, error } = await supabase
         .from("goals")
-        .insert({ title: "QA Goal", target_amount: 500, saved_amount: 0 })
+        .insert({ title: "QA Goal", target_amount: 500, saved_amount: 0, user_id: user.id })
         .select("id")
         .single();
       if (error) throw error;
@@ -110,6 +123,9 @@ const { error: upErr } = await (supabase as any)
 
   // Expenses suite
   const ensureCategory = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Трябва да сте влезли в профила си");
+
     const { data: catList, error } = await supabase
       .from("expense_categories")
       .select("id, name")
@@ -119,7 +135,7 @@ const { error: upErr } = await (supabase as any)
     if (catList && catList.length > 0) return catList[0].id as string;
     const { data: created, error: insErr } = await supabase
       .from("expense_categories")
-      .insert({ name: "QA" })
+      .insert({ name: "QA", user_id: user.id })
       .select("id")
       .single();
     if (insErr) throw insErr;
@@ -128,6 +144,12 @@ const { error: upErr } = await (supabase as any)
 
   const runExpenses = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "Грешка", description: "Трябва да сте влезли в профила си", variant: "destructive" });
+        return;
+      }
+
       log("Expenses: ensure QA category");
       const catId = await ensureCategory();
 
@@ -136,7 +158,7 @@ const { error: upErr } = await (supabase as any)
       if (!resp.ok) throw new Error("Неуспешно зареждане на файла");
       const blob = await resp.blob();
 
-      const fileName = `qa/${Date.now()}.svg`;
+      const fileName = `${user.id}/qa/${Date.now()}.svg`;
       log(`Expenses: upload ${fileName}`);
       const { data: up, error: upErr } = await supabase.storage
         .from("receipts")
@@ -147,7 +169,14 @@ const { error: upErr } = await (supabase as any)
       log("Expenses: insert expense");
       const { data: ins, error } = await supabase
         .from("expenses")
-        .insert({ amount: 9.99, incurred_at: todayStr, category_id: catId, description: "QA", receipt_path: up.path })
+        .insert({ 
+          amount: 9.99, 
+          incurred_at: todayStr, 
+          category_id: catId, 
+          description: "QA", 
+          receipt_path: up.path,
+          user_id: user.id 
+        })
         .select("id")
         .single();
       if (error) throw error;
@@ -185,10 +214,16 @@ const { error: upErr } = await (supabase as any)
   // Daily Cash suite
   const runDailyCash = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "Грешка", description: "Трябва да сте влезли в профила си", variant: "destructive" });
+        return;
+      }
+
       log("Daily Cash: insert test entry");
       const { data: cash, error: cashErr } = await supabase
         .from("daily_cash")
-        .insert({ amount: 100, date: monthStart, notes: "QA Test Entry" })
+        .insert({ amount: 100, date: monthStart, notes: "QA Test Entry", user_id: user.id })
         .select("id")
         .single();
       if (cashErr) throw cashErr;

@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import type { User } from "@supabase/supabase-js";
 
-interface Goal { id: string; title: string; target_amount: number; saved_amount: number }
+interface Goal { id: string; title: string; target_amount: number; saved_amount: number; user_id: string }
 
 export default function Goals() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   const [title, setTitle] = useState("Да съберем за асансьор");
   const [target, setTarget] = useState<number>(5000);
@@ -20,10 +22,28 @@ export default function Goals() {
   const pct = useMemo(() => (target ? Math.min(100, Math.round((saved / target) * 100)) : 0), [saved, target]);
 
   useEffect(() => {
+    // Get current user
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getCurrentUser();
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    
     const load = async () => {
       const { data, error } = await supabase
         .from("goals")
-        .select("id,title,target_amount,saved_amount")
+        .select("id,title,target_amount,saved_amount,user_id")
         .order("created_at", { ascending: true });
       if (error) {
         toast({ title: "Грешка", description: error.message, variant: "destructive" });
@@ -32,7 +52,7 @@ export default function Goals() {
       setGoals((data || []) as any);
     };
     load();
-  }, []);
+  }, [user]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -48,6 +68,11 @@ export default function Goals() {
         toast({ title: "Невалидни данни", description: "Попълнете всички полета коректно.", variant: "destructive" });
         return;
       }
+      if (!user) {
+        toast({ title: "Грешка", description: "Трябва да сте влезли в профила си", variant: "destructive" });
+        return;
+      }
+      
       if (editingId) {
         const { data, error } = await supabase
           .from("goals")
@@ -62,7 +87,7 @@ export default function Goals() {
       } else {
         const { data, error } = await supabase
           .from("goals")
-          .insert({ title, target_amount: target, saved_amount: saved })
+          .insert({ title, target_amount: target, saved_amount: saved, user_id: user.id })
           .select()
           .single();
         if (error) throw error;

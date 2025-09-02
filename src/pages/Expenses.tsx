@@ -34,12 +34,6 @@ export default function Expenses() {
   useEffect(() => {
     const load = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          toast({ title: "Грешка", description: "Трябва да сте влезли в профила си", variant: "destructive" });
-          return;
-        }
-
         const [{ data: cats, error: cErr }, { data: exps, error: eErr }] = await Promise.all([
           supabase.from("expense_categories").select("id,name").order("name"),
           supabase.from("expenses").select("id,amount,incurred_at,description,receipt_path,category_id").order("incurred_at", { ascending: false }),
@@ -59,30 +53,16 @@ export default function Expenses() {
   const saveExpense = async () => {
     try {
       if (!amount || !date) return;
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({ title: "Грешка", description: "Трябва да сте влезли в профила си", variant: "destructive" });
-        return;
-      }
-
       let receipt_path: string | null = null;
       if (file) {
-        const path = `${user.id}/${Date.now()}_${file.name}`;
+        const path = `${Date.now()}_${file.name}`;
         const { error: upErr } = await supabase.storage.from("receipts").upload(path, file, { upsert: false });
         if (upErr) throw upErr;
         receipt_path = path;
       }
       const { data, error } = await supabase
         .from("expenses")
-        .insert({ 
-          amount, 
-          incurred_at: date, 
-          category_id: categoryId || null, 
-          description: description || null, 
-          receipt_path,
-          user_id: user.id
-        })
+        .insert({ amount, incurred_at: date, category_id: categoryId || null, description: description || null, receipt_path })
         .select()
         .single();
       if (error) throw error;
@@ -130,12 +110,6 @@ export default function Expenses() {
   const saveEdit = async () => {
     try {
       if (!editingId || !editAmount || !editDate) return;
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({ title: "Грешка", description: "Трябва да сте влезли в профила си", variant: "destructive" });
-        return;
-      }
       
       const { data, error } = await supabase
         .from("expenses")

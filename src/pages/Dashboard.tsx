@@ -32,12 +32,6 @@ export default function Dashboard() {
       
       try {
         setLoading(true);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          toast({ title: "Грешка", description: "Трябва да сте влезли в профила си", variant: "destructive" });
-          return;
-        }
-
         const [{ data: exps, error: eErr }, { data: cats, error: catErr }] = await Promise.all([
           supabase.from("expenses").select("id,amount,incurred_at,category_id")
             .gte("incurred_at", dateRange.from.toISOString().split('T')[0])

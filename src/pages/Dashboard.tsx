@@ -9,6 +9,7 @@ import { startOfMonth, endOfMonth, format } from "date-fns";
 import { bg } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { useCurrency } from "@/hooks/useCurrency";
 
 const COLORS = ["hsl(var(--accent-1))", "hsl(var(--accent-2))", "hsl(var(--accent-3))", "hsl(var(--primary))"]; 
 
@@ -17,6 +18,7 @@ type Category = { id: string; name: string };
 type Goal = { id: string; title: string; target_amount: number; saved_amount: number };
 
 export default function Dashboard() {
+  const { formatAmount } = useCurrency();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -91,7 +93,7 @@ export default function Dashboard() {
             `(${format(dateRange.from, "dd.MM.yyyy", { locale: bg })} - ${format(dateRange.to, "dd.MM.yyyy", { locale: bg })})` : 
             ""
           }`} 
-          value={`${currentExpense.toFixed(2)} лв.`} 
+          value={`${formatAmount(currentExpense)}`} 
           trend="" 
         />
       </div>
@@ -111,7 +113,7 @@ export default function Dashboard() {
                     <div className="flex justify-between items-center">
                       <h4 className="font-medium">{goal.title}</h4>
                       <span className="text-sm text-muted-foreground">
-                        {goal.saved_amount.toFixed(2)} / {goal.target_amount.toFixed(2)} лв.
+                        {formatAmount(goal.saved_amount)} / {formatAmount(goal.target_amount)}
                       </span>
                     </div>
                     <Progress value={progress} className="h-2" />

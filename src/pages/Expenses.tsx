@@ -7,11 +7,13 @@ import { Edit2, Check, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import { useCurrency } from "@/hooks/useCurrency";
 
 interface ExpenseRow { id: string; amount: number; incurred_at: string; description: string | null; receipt_path: string | null; category_id: string | null }
 interface Category { id: string; name: string }
 
 export default function Expenses() {
+  const { formatAmount, currency } = useCurrency();
   const [items, setItems] = useState<ExpenseRow[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
 
@@ -72,7 +74,7 @@ export default function Expenses() {
       setDescription("");
       setFile(null);
       if (fileRef.current) fileRef.current.value = "";
-      toast({ title: "Записан разход", description: `${amount.toFixed(2)} лв.` });
+      toast({ title: "Записан разход", description: formatAmount(amount) });
     } catch (e: any) {
       toast({ title: "Грешка", description: e.message, variant: "destructive" });
     }
@@ -130,7 +132,7 @@ export default function Expenses() {
       ));
       
       cancelEdit();
-      toast({ title: "Разходът е обновен", description: `${editAmount.toFixed(2)} лв.` });
+      toast({ title: "Разходът е обновен", description: formatAmount(editAmount) });
     } catch (e: any) {
       toast({ title: "Грешка при редактиране", description: e.message, variant: "destructive" });
     }
@@ -158,7 +160,7 @@ export default function Expenses() {
           <CardContent className="grid gap-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1">
-                <label className="text-sm">Сума (лв.)</label>
+                <label className="text-sm">Сума ({currency === 'BGN' ? 'лв.' : '€'})</label>
                 <Input type="number" value={amount || ''} onChange={(e) => setAmount(Number(e.target.value || 0))} />
               </div>
               <div className="grid gap-1">
@@ -208,7 +210,7 @@ export default function Expenses() {
                   <div className="grid gap-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="grid gap-1">
-                        <label className="text-sm">Сума (лв.)</label>
+                        <label className="text-sm">Сума ({currency === 'BGN' ? 'лв.' : '€'})</label>
                         <Input 
                           type="number" 
                           value={editAmount || ''} 
@@ -260,7 +262,7 @@ export default function Expenses() {
                   <>
                     <div className="flex items-center justify-between">
                       <div className="font-medium">{e.description || "Разход"}</div>
-                      <div className="font-semibold">{Number(e.amount).toFixed(2)} лв.</div>
+                      <div className="font-semibold">{formatAmount(Number(e.amount))}</div>
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {new Date(e.incurred_at).toLocaleDateString('bg-BG')}

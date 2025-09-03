@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session } from "@supabase/supabase-js";
+import { CurrencySelector } from "@/components/ui/currency-selector";
 
 const navItems = [
   { to: "/dashboard", label: "Табло", Icon: PieChart },
@@ -65,6 +66,7 @@ export default function MainLayout() {
               Домова каса онлайн
             </Link>
             <div className="flex items-center gap-2">
+              <CurrencySelector />
               {session ? (
                 <Button variant="outline" size="sm" onClick={handleSignOut}>
                   Изход

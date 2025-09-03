@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import { useCurrency } from "@/hooks/useCurrency";
 
 interface Goal { id: string; title: string; target_amount: number; saved_amount: number }
 
 export default function Goals() {
+  const { formatAmount, currency } = useCurrency();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -115,18 +117,18 @@ export default function Goals() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-1">
-                  <label className="text-sm">Целева сума (лв.)</label>
+                  <label className="text-sm">Целева сума ({currency === 'BGN' ? 'лв.' : '€'})</label>
                   <Input type="number" value={target} onChange={(e) => setTarget(Number(e.target.value || 0))} />
                 </div>
                 <div className="grid gap-1">
-                  <label className="text-sm">Събрани до момента (лв.)</label>
+                  <label className="text-sm">Събрани до момента ({currency === 'BGN' ? 'лв.' : '€'})</label>
                   <Input type="number" value={saved} onChange={(e) => setSaved(Number(e.target.value || 0))} />
                 </div>
               </div>
               <div className="grid gap-1">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Прогрес</span>
-                  <span className="font-medium">{saved.toLocaleString("bg-BG")} лв. / {target.toLocaleString("bg-BG")} лв. ({pct}%)</span>
+                  <span className="font-medium">{formatAmount(saved)} / {formatAmount(target)} ({pct}%)</span>
                 </div>
                 <Progress value={pct} />
               </div>
@@ -155,7 +157,7 @@ export default function Goals() {
                   <div key={g.id} className="border rounded-md p-3 grid gap-2">
                     <div className="flex items-center justify-between">
                       <div className="font-medium">{g.title}</div>
-                      <div className="font-semibold">{Number(g.saved_amount).toFixed(2)} / {Number(g.target_amount).toFixed(2)} лв.</div>
+                      <div className="font-semibold">{formatAmount(Number(g.saved_amount))} / {formatAmount(Number(g.target_amount))}</div>
                     </div>
                     <Progress value={p} />
                     <div className="flex gap-2">

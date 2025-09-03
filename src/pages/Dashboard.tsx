@@ -1,5 +1,6 @@
 import { Helmet } from "react-helmet-async";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Pie, PieChart as RPieChart, Cell, Tooltip as RTooltip, ResponsiveContainer, Legend } from "recharts";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,10 +14,12 @@ const COLORS = ["hsl(var(--accent-1))", "hsl(var(--accent-2))", "hsl(var(--accen
 
 type Expense = { id: string; amount: number; incurred_at: string; category_id: string | null };
 type Category = { id: string; name: string };
+type Goal = { id: string; title: string; target_amount: number; saved_amount: number };
 
 export default function Dashboard() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
     const today = new Date();
@@ -32,15 +35,17 @@ export default function Dashboard() {
       
       try {
         setLoading(true);
-        const [{ data: exps, error: eErr }, { data: cats, error: catErr }] = await Promise.all([
+        const [{ data: exps, error: eErr }, { data: cats, error: catErr }, { data: goalData, error: goalErr }] = await Promise.all([
           supabase.from("expenses").select("id,amount,incurred_at,category_id")
             .gte("incurred_at", dateRange.from.toISOString().split('T')[0])
             .lte("incurred_at", dateRange.to.toISOString().split('T')[0]),
           supabase.from("expense_categories").select("id,name"),
+          supabase.from("goals").select("id,title,target_amount,saved_amount"),
         ]);
-        if (eErr) throw eErr; if (catErr) throw catErr;
+        if (eErr) throw eErr; if (catErr) throw catErr; if (goalErr) throw goalErr;
         setExpenses(exps || []);
         setCategories(cats || []);
+        setGoals(goalData || []);
       } catch (e: any) {
         toast({ title: "Грешка", description: e.message, variant: "destructive" });
       } finally {
@@ -89,6 +94,40 @@ export default function Dashboard() {
           value={`${currentExpense.toFixed(2)} лв.`} 
           trend="" 
         />
+      </div>
+
+      {/* Goals Section */}
+      <div className="mt-6 max-w-2xl">
+        <Card className="glass-surface">
+          <CardHeader>
+            <CardTitle>Цели за спестяване</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {goals.length > 0 ? (
+              goals.map((goal) => {
+                const progress = goal.target_amount > 0 ? (goal.saved_amount / goal.target_amount) * 100 : 0;
+                return (
+                  <div key={goal.id} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-medium">{goal.title}</h4>
+                      <span className="text-sm text-muted-foreground">
+                        {goal.saved_amount.toFixed(2)} / {goal.target_amount.toFixed(2)} лв.
+                      </span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                    <div className="text-xs text-muted-foreground text-right">
+                      {progress.toFixed(1)}% завършено
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center text-muted-foreground py-8">
+                Няма добавени цели за спестяване
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <div className="mt-6 max-w-2xl">

@@ -15,7 +15,7 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [currency, setCurrencyState] = useState<Currency>(() => {
-    return (localStorage.getItem('currency') as Currency) || 'BGN';
+    return (localStorage.getItem('currency') as Currency) || 'EUR';
   });
   const [exchangeRate, setExchangeRate] = useState<number>(1.95583); // Default BGN/EUR rate
   const [loading, setLoading] = useState(false);

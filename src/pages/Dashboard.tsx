@@ -9,7 +9,6 @@ import { startOfMonth, endOfMonth, format } from "date-fns";
 import { bg } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { useCurrency } from "@/hooks/useCurrency";
 
 const COLORS = ["hsl(var(--accent-1))", "hsl(var(--accent-2))", "hsl(var(--accent-3))", "hsl(var(--primary))"]; 
 
@@ -18,7 +17,7 @@ type Category = { id: string; name: string };
 type Goal = { id: string; title: string; target_amount: number; saved_amount: number };
 
 export default function Dashboard() {
-  const { formatAmount } = useCurrency();
+  const formatAmount = (amount: number) => `${amount.toFixed(2)} лв.`;
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);

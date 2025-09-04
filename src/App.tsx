@@ -17,7 +17,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import QA from "./pages/QA";
-import { CurrencyProvider } from "@/hooks/useCurrency";
+
 
 const queryClient = new QueryClient();
 
@@ -50,30 +50,28 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <CurrencyProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <HelmetProvider>
-            <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <HelmetProvider>
+          <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
 
-            <Route element={<RequireAuth><MainLayout /></RequireAuth>}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/expenses" element={<Expenses />} />
-              <Route path="/goals" element={<Goals />} />
-              <Route path="/qa" element={<QA />} />
-            </Route>
+          <Route element={<RequireAuth><MainLayout /></RequireAuth>}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/expenses" element={<Expenses />} />
+            <Route path="/goals" element={<Goals />} />
+            <Route path="/qa" element={<QA />} />
+          </Route>
 
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-            </Routes>
-          </HelmetProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </CurrencyProvider>
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+          </Routes>
+        </HelmetProvider>
+      </BrowserRouter>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 

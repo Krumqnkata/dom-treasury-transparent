@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
@@ -11,13 +12,15 @@ import { useCurrency } from "@/hooks/useCurrency";
 interface Goal { id: string; title: string; target_amount: number; saved_amount: number }
 
 export default function Goals() {
-  const { formatAmount, currency } = useCurrency();
+  const { formatAmount, currency, convertAmount } = useCurrency();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [title, setTitle] = useState("Да съберем за асансьор");
   const [target, setTarget] = useState<number>(5000);
+  const [targetCurrency, setTargetCurrency] = useState<'BGN' | 'EUR'>('EUR');
   const [saved, setSaved] = useState<number>(0);
+  const [savedCurrency, setSavedCurrency] = useState<'BGN' | 'EUR'>('EUR');
 
   const pct = useMemo(() => (target ? Math.min(100, Math.round((saved / target) * 100)) : 0), [saved, target]);
 
@@ -40,7 +43,9 @@ export default function Goals() {
     setEditingId(null);
     setTitle("Да съберем за асансьор");
     setTarget(5000);
+    setTargetCurrency('EUR');
     setSaved(0);
+    setSavedCurrency('EUR');
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -50,10 +55,14 @@ export default function Goals() {
         toast({ title: "Невалидни данни", description: "Попълнете всички полета коректно.", variant: "destructive" });
         return;
       }
+      // Convert amounts to BGN for storage
+      const targetInBGN = targetCurrency === 'EUR' ? convertAmount(target, false) : target;
+      const savedInBGN = savedCurrency === 'EUR' ? convertAmount(saved, false) : saved;
+      
       if (editingId) {
         const { data, error } = await supabase
           .from("goals")
-          .update({ title, target_amount: target, saved_amount: saved })
+          .update({ title, target_amount: targetInBGN, saved_amount: savedInBGN })
           .eq("id", editingId)
           .select()
           .single();
@@ -64,7 +73,7 @@ export default function Goals() {
       } else {
         const { data, error } = await supabase
           .from("goals")
-          .insert({ title, target_amount: target, saved_amount: saved })
+          .insert({ title, target_amount: targetInBGN, saved_amount: savedInBGN })
           .select()
           .single();
         if (error) throw error;
@@ -81,7 +90,9 @@ export default function Goals() {
     setEditingId(g.id);
     setTitle(g.title);
     setTarget(Number(g.target_amount));
+    setTargetCurrency('BGN'); // Always show BGN amounts from DB
     setSaved(Number(g.saved_amount));
+    setSavedCurrency('BGN'); // Always show BGN amounts from DB
   };
 
   const remove = async (g: Goal) => {
@@ -117,18 +128,52 @@ export default function Goals() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-1">
-                  <label className="text-sm">Целева сума ({currency === 'BGN' ? 'лв.' : '€'})</label>
-                  <Input type="number" value={target} onChange={(e) => setTarget(Number(e.target.value || 0))} />
+                  <label className="text-sm">Целева сума</label>
+                  <div className="flex gap-2">
+                    <Input 
+                      type="number" 
+                      value={target} 
+                      onChange={(e) => setTarget(Number(e.target.value || 0))} 
+                      className="flex-1"
+                    />
+                    <Select value={targetCurrency} onValueChange={(value: 'BGN' | 'EUR') => setTargetCurrency(value)}>
+                      <SelectTrigger className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="BGN">лв.</SelectItem>
+                        <SelectItem value="EUR">€</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="grid gap-1">
-                  <label className="text-sm">Събрани до момента ({currency === 'BGN' ? 'лв.' : '€'})</label>
-                  <Input type="number" value={saved} onChange={(e) => setSaved(Number(e.target.value || 0))} />
+                  <label className="text-sm">Събрани до момента</label>
+                  <div className="flex gap-2">
+                    <Input 
+                      type="number" 
+                      value={saved} 
+                      onChange={(e) => setSaved(Number(e.target.value || 0))} 
+                      className="flex-1"
+                    />
+                    <Select value={savedCurrency} onValueChange={(value: 'BGN' | 'EUR') => setSavedCurrency(value)}>
+                      <SelectTrigger className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="BGN">лв.</SelectItem>
+                        <SelectItem value="EUR">€</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
               <div className="grid gap-1">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Прогрес</span>
-                  <span className="font-medium">{formatAmount(saved)} / {formatAmount(target)} ({pct}%)</span>
+                  <span className="font-medium">
+                    {savedCurrency === 'EUR' ? `${saved} €` : `${saved} лв.`} / {targetCurrency === 'EUR' ? `${target} €` : `${target} лв.`} ({pct}%)
+                  </span>
                 </div>
                 <Progress value={pct} />
               </div>

@@ -13,13 +13,14 @@ interface ExpenseRow { id: string; amount: number; incurred_at: string; descript
 interface Category { id: string; name: string }
 
 export default function Expenses() {
-  const { formatAmount, currency } = useCurrency();
+  const { formatAmount, currency, convertAmount } = useCurrency();
   const [items, setItems] = useState<ExpenseRow[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
 
   const today = useMemo(() => new Date().toISOString().slice(0,10), []);
 
   const [amount, setAmount] = useState<number>(0);
+  const [inputCurrency, setInputCurrency] = useState<'BGN' | 'EUR'>('EUR');
   const [date, setDate] = useState<string>(today);
   const [categoryId, setCategoryId] = useState<string>("");
   const [description, setDescription] = useState<string>("");
@@ -29,6 +30,7 @@ export default function Expenses() {
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState<number>(0);
+  const [editInputCurrency, setEditInputCurrency] = useState<'BGN' | 'EUR'>('EUR');
   const [editDate, setEditDate] = useState<string>("");
   const [editCategoryId, setEditCategoryId] = useState<string>("");
   const [editDescription, setEditDescription] = useState<string>("");
@@ -62,9 +64,11 @@ export default function Expenses() {
         if (upErr) throw upErr;
         receipt_path = path;
       }
+      // Convert amount to BGN for storage
+      const amountInBGN = inputCurrency === 'EUR' ? convertAmount(amount, false) : amount;
       const { data, error } = await supabase
         .from("expenses")
-        .insert({ amount, incurred_at: date, category_id: categoryId || null, description: description || null, receipt_path })
+        .insert({ amount: amountInBGN, incurred_at: date, category_id: categoryId || null, description: description || null, receipt_path })
         .select()
         .single();
       if (error) throw error;
@@ -74,7 +78,7 @@ export default function Expenses() {
       setDescription("");
       setFile(null);
       if (fileRef.current) fileRef.current.value = "";
-      toast({ title: "Записан разход", description: formatAmount(amount) });
+      toast({ title: "Записан разход", description: formatAmount(amountInBGN) });
     } catch (e: any) {
       toast({ title: "Грешка", description: e.message, variant: "destructive" });
     }
@@ -96,6 +100,7 @@ export default function Expenses() {
   const startEdit = (expense: ExpenseRow) => {
     setEditingId(expense.id);
     setEditAmount(expense.amount);
+    setEditInputCurrency('BGN'); // Always show BGN amounts from DB
     setEditDate(expense.incurred_at);
     setEditCategoryId(expense.category_id || "");
     setEditDescription(expense.description || "");
@@ -104,6 +109,7 @@ export default function Expenses() {
   const cancelEdit = () => {
     setEditingId(null);
     setEditAmount(0);
+    setEditInputCurrency('EUR');
     setEditDate("");
     setEditCategoryId("");
     setEditDescription("");
@@ -113,10 +119,13 @@ export default function Expenses() {
     try {
       if (!editingId || !editAmount || !editDate) return;
       
+      // Convert amount to BGN for storage
+      const amountInBGN = editInputCurrency === 'EUR' ? convertAmount(editAmount, false) : editAmount;
+      
       const { data, error } = await supabase
         .from("expenses")
         .update({ 
-          amount: editAmount, 
+          amount: amountInBGN, 
           incurred_at: editDate, 
           category_id: editCategoryId || null, 
           description: editDescription || null 
@@ -132,7 +141,7 @@ export default function Expenses() {
       ));
       
       cancelEdit();
-      toast({ title: "Разходът е обновен", description: formatAmount(editAmount) });
+      toast({ title: "Разходът е обновен", description: formatAmount(amountInBGN) });
     } catch (e: any) {
       toast({ title: "Грешка при редактиране", description: e.message, variant: "destructive" });
     }
@@ -160,8 +169,24 @@ export default function Expenses() {
           <CardContent className="grid gap-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1">
-                <label className="text-sm">Сума ({currency === 'BGN' ? 'лв.' : '€'})</label>
-                <Input type="number" value={amount || ''} onChange={(e) => setAmount(Number(e.target.value || 0))} />
+                <label className="text-sm">Сума</label>
+                <div className="flex gap-2">
+                  <Input 
+                    type="number" 
+                    value={amount || ''} 
+                    onChange={(e) => setAmount(Number(e.target.value || 0))} 
+                    className="flex-1"
+                  />
+                  <Select value={inputCurrency} onValueChange={(value: 'BGN' | 'EUR') => setInputCurrency(value)}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BGN">лв.</SelectItem>
+                      <SelectItem value="EUR">€</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="grid gap-1">
                 <label className="text-sm">Дата</label>
@@ -210,12 +235,24 @@ export default function Expenses() {
                   <div className="grid gap-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="grid gap-1">
-                        <label className="text-sm">Сума ({currency === 'BGN' ? 'лв.' : '€'})</label>
-                        <Input 
-                          type="number" 
-                          value={editAmount || ''} 
-                          onChange={(e) => setEditAmount(Number(e.target.value || 0))} 
-                        />
+                        <label className="text-sm">Сума</label>
+                        <div className="flex gap-2">
+                          <Input 
+                            type="number" 
+                            value={editAmount || ''} 
+                            onChange={(e) => setEditAmount(Number(e.target.value || 0))} 
+                            className="flex-1"
+                          />
+                          <Select value={editInputCurrency} onValueChange={(value: 'BGN' | 'EUR') => setEditInputCurrency(value)}>
+                            <SelectTrigger className="w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="BGN">лв.</SelectItem>
+                              <SelectItem value="EUR">€</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                       <div className="grid gap-1">
                         <label className="text-sm">Дата</label>

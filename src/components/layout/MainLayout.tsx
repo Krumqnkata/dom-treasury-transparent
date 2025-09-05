@@ -1,6 +1,13 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { PieChart, Wallet, ReceiptText, PiggyBank } from "lucide-react";
+import { PieChart, Wallet, ReceiptText, PiggyBank, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { 
+  Sheet, 
+  SheetContent, 
+  SheetHeader, 
+  SheetTitle, 
+  SheetTrigger 
+} from "@/components/ui/sheet";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session } from "@supabase/supabase-js";
@@ -61,9 +68,43 @@ export default function MainLayout() {
       <div className="flex flex-col min-h-screen">
         <header className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b">
           <div className="container mx-auto flex items-center justify-between h-16 px-4">
-            <Link to="/" className="font-semibold">
-              Домова каса онлайн
-            </Link>
+            <div className="flex items-center gap-3">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Отвори меню</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-64">
+                  <SheetHeader>
+                    <SheetTitle>Навигация</SheetTitle>
+                  </SheetHeader>
+                  <nav className="flex flex-col gap-2 mt-6">
+                    {navItems.map(({ to, label, Icon }) => (
+                      <NavLink
+                        key={to}
+                        to={to}
+                        className={({ isActive }) =>
+                          [
+                            "flex items-center gap-3 rounded-md px-3 py-2 transition-colors",
+                            isActive
+                              ? "bg-accent text-accent-foreground"
+                              : "hover:bg-muted",
+                          ].join(" ")
+                        }
+                      >
+                        <Icon className="opacity-80 h-4 w-4" />
+                        <span className="font-medium">{label}</span>
+                      </NavLink>
+                    ))}
+                  </nav>
+                </SheetContent>
+              </Sheet>
+              <Link to="/" className="font-semibold">
+                Домова каса онлайн
+              </Link>
+            </div>
             <div className="flex items-center gap-2">
               {session ? (
                 <Button variant="outline" size="sm" onClick={handleSignOut}>

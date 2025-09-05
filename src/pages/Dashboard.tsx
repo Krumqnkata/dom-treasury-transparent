@@ -9,6 +9,7 @@ import { startOfMonth, endOfMonth, format } from "date-fns";
 import { bg } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { addMonths, subMonths, startOfDay } from "date-fns";
 
 const COLORS = ["hsl(var(--accent-1))", "hsl(var(--accent-2))", "hsl(var(--accent-3))", "hsl(var(--primary))"]; 
 
@@ -22,6 +23,7 @@ export default function Dashboard() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [predictedExpense, setPredictedExpense] = useState(0);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
     const today = new Date();
     return {
@@ -36,17 +38,39 @@ export default function Dashboard() {
       
       try {
         setLoading(true);
-        const [{ data: exps, error: eErr }, { data: cats, error: catErr }, { data: goalData, error: goalErr }] = await Promise.all([
+        
+        // Calculate dates for prediction (last 3 months excluding current month)
+        const today = new Date();
+        const threeMonthsAgo = subMonths(startOfMonth(today), 3);
+        const lastMonth = subMonths(startOfMonth(today), 1);
+        
+        const [{ data: exps, error: eErr }, { data: cats, error: catErr }, { data: goalData, error: goalErr }, { data: historicalExps, error: histErr }] = await Promise.all([
           supabase.from("expenses").select("id,amount,incurred_at,category_id")
             .gte("incurred_at", dateRange.from.toISOString().split('T')[0])
             .lte("incurred_at", dateRange.to.toISOString().split('T')[0]),
           supabase.from("expense_categories").select("id,name"),
           supabase.from("goals").select("id,title,target_amount,saved_amount"),
+          supabase.from("expenses").select("amount,incurred_at")
+            .gte("incurred_at", threeMonthsAgo.toISOString().split('T')[0])
+            .lt("incurred_at", startOfMonth(today).toISOString().split('T')[0]),
         ]);
-        if (eErr) throw eErr; if (catErr) throw catErr; if (goalErr) throw goalErr;
+        
+        if (eErr) throw eErr; if (catErr) throw catErr; if (goalErr) throw goalErr; if (histErr) throw histErr;
+        
         setExpenses(exps || []);
         setCategories(cats || []);
         setGoals(goalData || []);
+        
+        // Calculate predicted expense based on last 3 months average
+        if (historicalExps && historicalExps.length > 0) {
+          const totalHistorical = historicalExps.reduce((sum, exp) => sum + Number(exp.amount), 0);
+          const monthsCount = 3; // We're looking at 3 months
+          const avgMonthlyExpense = totalHistorical / monthsCount;
+          setPredictedExpense(avgMonthlyExpense);
+        } else {
+          setPredictedExpense(0);
+        }
+        
       } catch (e: any) {
         toast({ title: "Грешка", description: e.message, variant: "destructive" });
       } finally {
@@ -86,7 +110,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-1 max-w-md">
+      <div className="grid gap-4 md:grid-cols-2 max-w-2xl">
         <StatCard 
           title={`Разходи за периода ${dateRange?.from && dateRange?.to ? 
             `(${format(dateRange.from, "dd.MM.yyyy", { locale: bg })} - ${format(dateRange.to, "dd.MM.yyyy", { locale: bg })})` : 
@@ -94,6 +118,11 @@ export default function Dashboard() {
           }`} 
           value={`${formatAmount(currentExpense)}`} 
           trend="" 
+        />
+        <StatCard 
+          title="Предсказан разход за следващия месец" 
+          value={`${formatAmount(predictedExpense)}`} 
+          trend={predictedExpense > 0 ? "Базиран на средни разходи за последните 3 месеца" : "Няма достатъчно данни"} 
         />
       </div>
 

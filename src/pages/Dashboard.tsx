@@ -110,24 +110,24 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 max-w-2xl">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 w-full max-w-4xl mx-auto px-4">
         <StatCard 
-          title={`Разходи за периода ${dateRange?.from && dateRange?.to ? 
-            `(${format(dateRange.from, "dd.MM.yyyy", { locale: bg })} - ${format(dateRange.to, "dd.MM.yyyy", { locale: bg })})` : 
-            ""
-          }`} 
+          title="Разходи за периода" 
           value={`${formatAmount(currentExpense)}`} 
-          trend="" 
+          trend={dateRange?.from && dateRange?.to ? 
+            `${format(dateRange.from, "dd.MM", { locale: bg })} - ${format(dateRange.to, "dd.MM", { locale: bg })}` : 
+            ""
+          } 
         />
         <StatCard 
-          title="Предсказан разход за следващия месец" 
+          title="Предсказан разход" 
           value={`${formatAmount(predictedExpense)}`} 
-          trend={predictedExpense > 0 ? "Базиран на средни разходи за последните 3 месеца" : "Няма достатъчно данни"} 
+          trend={predictedExpense > 0 ? "Базиран на последните 3 месеца" : "Няма достатъчно данни"} 
         />
       </div>
 
       {/* Goals Section */}
-      <div className="mt-6 max-w-2xl">
+      <div className="mt-8 w-full max-w-4xl mx-auto px-4">
         <Card className="glass-surface">
           <CardHeader>
             <CardTitle>Цели за спестяване</CardTitle>
@@ -160,27 +160,35 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="mt-6 max-w-2xl">
+      <div className="mt-8 w-full max-w-4xl mx-auto px-4">
         <Card className="glass-surface">
           <CardHeader>
-            <CardTitle>
-              За какво се харчат парите {dateRange?.from && dateRange?.to ? 
-                `(${format(dateRange.from, "dd.MM.yyyy", { locale: bg })} - ${format(dateRange.to, "dd.MM.yyyy", { locale: bg })})` : 
-                ""
-              }
+            <CardTitle className="text-base sm:text-lg">
+              За какво се харчат парите
+              {dateRange?.from && dateRange?.to && (
+                <span className="block text-sm text-muted-foreground mt-1">
+                  {format(dateRange.from, "dd.MM.yyyy", { locale: bg })} - {format(dateRange.to, "dd.MM.yyyy", { locale: bg })}
+                </span>
+              )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="h-96">
+          <CardContent className="h-80 sm:h-96">
             {pieData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <RPieChart>
-                  <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={120}>
+                  <Pie 
+                    data={pieData} 
+                    dataKey="value" 
+                    nameKey="name" 
+                    outerRadius="80%" 
+                    innerRadius="20%"
+                  >
                     {pieData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <RTooltip />
-                  <Legend />
+                  <RTooltip formatter={(value) => `${Number(value).toFixed(2)} лв.`} />
+                  <Legend wrapperStyle={{ fontSize: '14px' }} />
                 </RPieChart>
               </ResponsiveContainer>
             ) : (
@@ -198,12 +206,12 @@ export default function Dashboard() {
 function StatCard({ title, value, trend }: { title: string; value: string; trend: string }) {
   return (
     <Card className="group perspective relative overflow-hidden">
-      <CardHeader>
-        <CardTitle className="text-sm text-muted-foreground">{title}</CardTitle>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm text-muted-foreground leading-tight">{title}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-semibold">{value}</div>
-        <div className="text-xs text-muted-foreground mt-1">{trend}</div>
+      <CardContent className="pt-0">
+        <div className="text-2xl sm:text-3xl font-semibold leading-tight">{value}</div>
+        {trend && <div className="text-xs text-muted-foreground mt-2 leading-relaxed">{trend}</div>}
       </CardContent>
     </Card>
   );

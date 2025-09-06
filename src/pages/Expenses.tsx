@@ -3,18 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Edit2, Check, X } from "lucide-react";
+import { Edit2, Check, X, Bookmark, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
 interface ExpenseRow { id: string; amount: number; incurred_at: string; description: string | null; receipt_path: string | null; category_id: string | null }
 interface Category { id: string; name: string }
+interface ExpenseTemplate { id: string; name: string; description: string | null; amount: number | null; category_id: string | null }
 
 export default function Expenses() {
   const formatAmount = (amount: number) => `${amount.toFixed(2)} лв.`;
   const [items, setItems] = useState<ExpenseRow[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [templates, setTemplates] = useState<ExpenseTemplate[]>([]);
 
   const today = useMemo(() => new Date().toISOString().slice(0,10), []);
 
@@ -32,17 +34,27 @@ export default function Expenses() {
   const [editCategoryId, setEditCategoryId] = useState<string>("");
   const [editDescription, setEditDescription] = useState<string>("");
 
+  // Template state
+  const [templateName, setTemplateName] = useState<string>("");
+  const [templateDescription, setTemplateDescription] = useState<string>("");
+  const [templateAmount, setTemplateAmount] = useState<number | null>(null);
+  const [templateCategoryId, setTemplateCategoryId] = useState<string>("");
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+
   useEffect(() => {
     const load = async () => {
       try {
-        const [{ data: cats, error: cErr }, { data: exps, error: eErr }] = await Promise.all([
+        const [{ data: cats, error: cErr }, { data: exps, error: eErr }, { data: temps, error: tErr }] = await Promise.all([
           supabase.from("expense_categories").select("id,name").order("name"),
           supabase.from("expenses").select("id,amount,incurred_at,description,receipt_path,category_id").order("incurred_at", { ascending: false }),
+          supabase.from("expense_templates").select("id,name,description,amount,category_id").order("name"),
         ]);
         if (cErr) throw cErr;
         if (eErr) throw eErr;
+        if (tErr) throw tErr;
         setCategories(cats || []);
         setItems(exps || []);
+        setTemplates(temps || []);
         if (cats && cats.length && !categoryId) setCategoryId(cats[0].id);
       } catch (e: any) {
         toast({ title: "Грешка", description: e.message, variant: "destructive" });
@@ -143,6 +155,54 @@ export default function Expenses() {
     return data.publicUrl;
   };
 
+  // Template functions
+  const saveTemplate = async () => {
+    try {
+      if (!templateName) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Не сте влезли в профила си");
+      
+      const { data, error } = await supabase
+        .from("expense_templates")
+        .insert({ 
+          user_id: user.id,
+          name: templateName, 
+          description: templateDescription || null, 
+          amount: templateAmount, 
+          category_id: templateCategoryId || null 
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      setTemplates((prev) => [...prev, data as any]);
+      setTemplateName("");
+      setTemplateDescription("");
+      setTemplateAmount(null);
+      setTemplateCategoryId("");
+      toast({ title: "Шаблон създаден", description: templateName });
+    } catch (e: any) {
+      toast({ title: "Грешка", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const useTemplate = (template: ExpenseTemplate) => {
+    if (template.amount) setAmount(template.amount);
+    if (template.category_id) setCategoryId(template.category_id);
+    if (template.description) setDescription(template.description);
+    toast({ title: "Използван шаблон", description: template.name });
+  };
+
+  const deleteTemplate = async (templateId: string) => {
+    try {
+      const { error } = await supabase.from("expense_templates").delete().eq("id", templateId);
+      if (error) throw error;
+      setTemplates((prev) => prev.filter((t) => t.id !== templateId));
+      toast({ title: "Шаблон изтрит" });
+    } catch (e: any) {
+      toast({ title: "Грешка при изтриване", description: e.message, variant: "destructive" });
+    }
+  };
+
   return (
     <>
       <Helmet>
@@ -151,7 +211,7 @@ export default function Expenses() {
         <link rel="canonical" href="/expenses" />
       </Helmet>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Card className="glass-surface">
           <CardHeader>
             <CardTitle>Нов разход</CardTitle>
@@ -190,6 +250,72 @@ export default function Expenses() {
             </div>
             <div>
               <Button variant="hero" onClick={saveExpense}>Запази разход</Button>
+            </div>
+            
+            {templates.length > 0 && (
+              <div className="border-t pt-3">
+                <div className="text-sm font-medium mb-2">Шаблони:</div>
+                <div className="grid gap-2">
+                  {templates.map((template) => (
+                    <div key={template.id} className="flex items-center justify-between p-2 border rounded text-sm">
+                      <div>
+                        <div className="font-medium">{template.name}</div>
+                        {template.description && (
+                          <div className="text-muted-foreground text-xs">{template.description}</div>
+                        )}
+                      </div>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="outline" onClick={() => useTemplate(template)}>
+                          <Bookmark className="size-3 mr-1" />
+                          Използвай
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => deleteTemplate(template.id)}>
+                          <Trash2 className="size-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="glass-surface">
+          <CardHeader>
+            <CardTitle>Нов шаблон</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <div className="grid gap-1">
+              <label className="text-sm">Име на шаблон</label>
+              <Input value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="напр. Пазаруване" />
+            </div>
+            <div className="grid gap-1">
+              <label className="text-sm">Описание</label>
+              <Input value={templateDescription} onChange={(e) => setTemplateDescription(e.target.value)} placeholder="Опционално" />
+            </div>
+            <div className="grid gap-1">
+              <label className="text-sm">Сума (лв.) - опционално</label>
+              <Input type="number" value={templateAmount || ''} onChange={(e) => setTemplateAmount(e.target.value ? Number(e.target.value) : null)} />
+            </div>
+            <div className="grid gap-1">
+              <label className="text-sm">Категория</label>
+              <Select value={templateCategoryId} onValueChange={setTemplateCategoryId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Изберете категория" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Button onClick={saveTemplate} disabled={!templateName}>
+                <Plus className="size-4 mr-1" />
+                Създай шаблон
+              </Button>
             </div>
           </CardContent>
         </Card>

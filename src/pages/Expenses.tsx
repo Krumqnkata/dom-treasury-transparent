@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
-interface ExpenseRow { id: string; amount: number; incurred_at: string; description: string | null; receipt_path: string | null; category_id: string | null }
+interface ExpenseRow { id: string; amount: number; incurred_at: string; description: string | null; receipt_path: string | null; category_id: string | null; recipient: string | null }
 interface Category { id: string; name: string }
 interface ExpenseTemplate { id: string; name: string; description: string | null; amount: number | null; category_id: string | null }
 
@@ -24,6 +24,7 @@ export default function Expenses() {
   const [date, setDate] = useState<string>(today);
   const [categoryId, setCategoryId] = useState<string>("");
   const [description, setDescription] = useState<string>("");
+  const [recipient, setRecipient] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -33,6 +34,7 @@ export default function Expenses() {
   const [editDate, setEditDate] = useState<string>("");
   const [editCategoryId, setEditCategoryId] = useState<string>("");
   const [editDescription, setEditDescription] = useState<string>("");
+  const [editRecipient, setEditRecipient] = useState<string>("");
 
   // Template state
   const [templateName, setTemplateName] = useState<string>("");
@@ -46,7 +48,7 @@ export default function Expenses() {
       try {
         const [{ data: cats, error: cErr }, { data: exps, error: eErr }, { data: temps, error: tErr }] = await Promise.all([
           supabase.from("expense_categories").select("id,name").order("name"),
-          supabase.from("expenses").select("id,amount,incurred_at,description,receipt_path,category_id").order("incurred_at", { ascending: false }),
+          supabase.from("expenses").select("id,amount,incurred_at,description,receipt_path,category_id,recipient").order("incurred_at", { ascending: false }),
           supabase.from("expense_templates").select("id,name,description,amount,category_id").order("name"),
         ]);
         if (cErr) throw cErr;
@@ -75,7 +77,7 @@ export default function Expenses() {
       }
       const { data, error } = await supabase
         .from("expenses")
-        .insert({ amount, incurred_at: date, category_id: categoryId || null, description: description || null, receipt_path })
+        .insert({ amount, incurred_at: date, category_id: categoryId || null, description: description || null, recipient: recipient || null, receipt_path })
         .select()
         .single();
       if (error) throw error;
@@ -83,6 +85,7 @@ export default function Expenses() {
       setAmount(0);
       setDate(today);
       setDescription("");
+      setRecipient("");
       setFile(null);
       if (fileRef.current) fileRef.current.value = "";
       toast({ title: "Записан разход", description: formatAmount(amount) });
@@ -110,6 +113,7 @@ export default function Expenses() {
     setEditDate(expense.incurred_at);
     setEditCategoryId(expense.category_id || "");
     setEditDescription(expense.description || "");
+    setEditRecipient(expense.recipient || "");
   };
 
   const cancelEdit = () => {
@@ -118,6 +122,7 @@ export default function Expenses() {
     setEditDate("");
     setEditCategoryId("");
     setEditDescription("");
+    setEditRecipient("");
   };
 
   const saveEdit = async () => {
@@ -130,7 +135,8 @@ export default function Expenses() {
           amount: editAmount, 
           incurred_at: editDate, 
           category_id: editCategoryId || null, 
-          description: editDescription || null 
+          description: editDescription || null,
+          recipient: editRecipient || null
         })
         .eq("id", editingId)
         .select()
@@ -243,6 +249,10 @@ export default function Expenses() {
             <div className="grid gap-1">
               <label className="text-sm">Описание</label>
               <Input value={description} onChange={(e) => setDescription(e.target.value)} />
+            </div>
+            <div className="grid gap-1">
+              <label className="text-sm">На кой</label>
+              <Input value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="На кого са дадени парите" />
             </div>
             <div className="grid gap-1">
               <label className="text-sm">Снимка на фактура/бележка</label>
@@ -371,6 +381,14 @@ export default function Expenses() {
                         onChange={(e) => setEditDescription(e.target.value)} 
                       />
                     </div>
+                    <div className="grid gap-1">
+                      <label className="text-sm">На кой</label>
+                      <Input 
+                        value={editRecipient} 
+                        onChange={(e) => setEditRecipient(e.target.value)} 
+                        placeholder="На кого са дадени парите"
+                      />
+                    </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={saveEdit}>
                         <Check className="size-4 mr-1" />
@@ -394,6 +412,11 @@ export default function Expenses() {
                       {e.category_id && (
                         <span className="ml-2 text-muted-foreground">
                           • {categories.find(c => c.id === e.category_id)?.name}
+                        </span>
+                      )}
+                      {e.recipient && (
+                        <span className="ml-2 text-muted-foreground">
+                          • На: {e.recipient}
                         </span>
                       )}
                     </div>

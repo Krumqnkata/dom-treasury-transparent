@@ -14,66 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      budgets: {
-        Row: {
-          amount: number
-          created_at: string
-          effective_at: string
-          id: string
-          note: string | null
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          effective_at?: string
-          id?: string
-          note?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          effective_at?: string
-          id?: string
-          note?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      daily_cash: {
-        Row: {
-          amount: number
-          created_at: string
-          date: string
-          id: string
-          notes: string | null
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          amount?: number
-          created_at?: string
-          date: string
-          id?: string
-          notes?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          date?: string
-          id?: string
-          notes?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       expense_categories: {
         Row: {
           created_at: string
@@ -137,6 +77,7 @@ export type Database = {
           id: string
           incurred_at: string
           receipt_path: string | null
+          recipient: string | null
           updated_at: string
           user_id: string | null
         }
@@ -148,6 +89,7 @@ export type Database = {
           id?: string
           incurred_at?: string
           receipt_path?: string | null
+          recipient?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -159,6 +101,7 @@ export type Database = {
           id?: string
           incurred_at?: string
           receipt_path?: string | null
+          recipient?: string | null
           updated_at?: string
           user_id?: string | null
         }

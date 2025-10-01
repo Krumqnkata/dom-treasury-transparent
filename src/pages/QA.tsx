@@ -10,7 +10,6 @@ export default function QA() {
   const [goalId, setGoalId] = useState<string | null>(null);
   const [expenseId, setExpenseId] = useState<string | null>(null);
   const [receiptPath, setReceiptPath] = useState<string | null>(null);
-  const [dailyCashId, setDailyCashId] = useState<string | null>(null);
 
   const [logs, setLogs] = useState<string[]>([]);
   const log = (m: string) => {
@@ -182,40 +181,6 @@ const { error: upErr } = await (supabase as any)
     }
   };
 
-  // Daily Cash suite
-  const runDailyCash = async () => {
-    try {
-      log("Daily Cash: insert test entry");
-      const { data: cash, error: cashErr } = await supabase
-        .from("daily_cash")
-        .insert({ amount: 100, date: monthStart, notes: "QA Test Entry" })
-        .select("id")
-        .single();
-      if (cashErr) throw cashErr;
-      setDailyCashId(cash.id);
-      log(`Daily Cash: inserted id=${cash.id}`);
-
-      toast({ title: "Daily Cash OK", description: "Добавен успешно" });
-    } catch (e: any) {
-      console.error(e);
-      toast({ title: "Daily Cash error", description: e.message, variant: "destructive" });
-      log(`Daily Cash error: ${e.message}`);
-    }
-  };
-
-  const cleanupDailyCash = async () => {
-    try {
-      if (dailyCashId) {
-        const { error } = await supabase.from("daily_cash").delete().eq("id", dailyCashId);
-        if (error) throw error;
-        log(`Daily Cash: deleted id=${dailyCashId}`);
-        setDailyCashId(null);
-      }
-      toast({ title: "Daily Cash cleanup", description: "Почистено" });
-    } catch (e: any) {
-      toast({ title: "Cleanup error", description: e.message, variant: "destructive" });
-    }
-  };
 
   return (
     <>
@@ -249,13 +214,6 @@ const { error: upErr } = await (supabase as any)
               <div className="flex flex-wrap gap-2">
                 <Button variant="hero" onClick={runExpenses}>Run</Button>
                 <Button variant="outline" onClick={cleanupExpenses} disabled={!expenseId && !receiptPath}>Clean up</Button>
-              </div>
-            </section>
-            <section>
-              <h2 className="text-lg font-semibold mb-2">Daily Cash</h2>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="hero" onClick={runDailyCash}>Run</Button>
-                <Button variant="outline" onClick={cleanupDailyCash} disabled={!dailyCashId}>Clean up</Button>
               </div>
             </section>
             <section>

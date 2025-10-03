@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
-import { goalSchema } from "@/lib/validations";
 
 interface Goal { id: string; title: string; target_amount: number; saved_amount: number }
 
@@ -46,11 +45,8 @@ export default function Goals() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Validate input
-      const validation = goalSchema.safeParse({ title, target, saved });
-      if (!validation.success) {
-        const firstError = validation.error.issues[0];
-        toast({ title: "Невалидни данни", description: firstError.message, variant: "destructive" });
+      if (!title.trim() || target < 0 || saved < 0) {
+        toast({ title: "Невалидни данни", description: "Попълнете всички полета коректно.", variant: "destructive" });
         return;
       }
       if (editingId) {
@@ -65,20 +61,9 @@ export default function Goals() {
         toast({ title: "Целта е обновена" });
         resetForm();
       } else {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          toast({ title: "Грешка", description: "Не сте влезли в профила си", variant: "destructive" });
-          return;
-        }
-        
         const { data, error } = await supabase
           .from("goals")
-          .insert({ 
-            user_id: user.id,
-            title, 
-            target_amount: target, 
-            saved_amount: saved 
-          })
+          .insert({ title, target_amount: target, saved_amount: saved })
           .select()
           .single();
         if (error) throw error;

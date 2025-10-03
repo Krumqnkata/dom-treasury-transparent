@@ -69,10 +69,13 @@ const { error: upErr } = await (supabase as any)
   // Goals suite
   const runGoals = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Не сте влезли в профила си");
+      
       log("Goals: insert QA Goal");
       const { data: ins, error } = await supabase
         .from("goals")
-        .insert({ title: "QA Goal", target_amount: 500, saved_amount: 0 })
+        .insert({ user_id: user.id, title: "QA Goal", target_amount: 500, saved_amount: 0 })
         .select("id")
         .single();
       if (error) throw error;
@@ -109,6 +112,9 @@ const { error: upErr } = await (supabase as any)
 
   // Expenses suite
   const ensureCategory = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Не сте влезли в профила си");
+    
     const { data: catList, error } = await supabase
       .from("expense_categories")
       .select("id, name")
@@ -118,7 +124,7 @@ const { error: upErr } = await (supabase as any)
     if (catList && catList.length > 0) return catList[0].id as string;
     const { data: created, error: insErr } = await supabase
       .from("expense_categories")
-      .insert({ name: "QA" })
+      .insert({ user_id: user.id, name: "QA" })
       .select("id")
       .single();
     if (insErr) throw insErr;
@@ -127,6 +133,9 @@ const { error: upErr } = await (supabase as any)
 
   const runExpenses = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Не сте влезли в профила си");
+      
       log("Expenses: ensure QA category");
       const catId = await ensureCategory();
 
@@ -135,7 +144,7 @@ const { error: upErr } = await (supabase as any)
       if (!resp.ok) throw new Error("Неуспешно зареждане на файла");
       const blob = await resp.blob();
 
-      const fileName = `qa/${Date.now()}.svg`;
+      const fileName = `${user.id}/qa/${Date.now()}.svg`;
       log(`Expenses: upload ${fileName}`);
       const { data: up, error: upErr } = await supabase.storage
         .from("receipts")
@@ -146,7 +155,7 @@ const { error: upErr } = await (supabase as any)
       log("Expenses: insert expense");
       const { data: ins, error } = await supabase
         .from("expenses")
-        .insert({ amount: 9.99, incurred_at: todayStr, category_id: catId, description: "QA", receipt_path: up.path })
+        .insert({ user_id: user.id, amount: 9.99, incurred_at: todayStr, category_id: catId, description: "QA", receipt_path: up.path })
         .select("id")
         .single();
       if (error) throw error;

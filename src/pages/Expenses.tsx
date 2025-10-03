@@ -7,6 +7,7 @@ import { Edit2, Check, X, Bookmark, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import { expenseSchema, templateSchema, receiptFileSchema } from "@/lib/validations";
 
 interface ExpenseRow { id: string; amount: number; incurred_at: string; description: string | null; receipt_path: string | null; category_id: string | null; recipient: string | null }
 interface Category { id: string; name: string }
@@ -67,17 +68,48 @@ export default function Expenses() {
 
   const saveExpense = async () => {
     try {
-      if (!amount || !date) return;
+      // Validate input
+      const validation = expenseSchema.safeParse({ amount, date, description, recipient, categoryId });
+      if (!validation.success) {
+        const firstError = validation.error.issues[0];
+        toast({ title: "Невалидни данни", description: firstError.message, variant: "destructive" });
+        return;
+      }
+      
+      // Validate file if present
+      if (file) {
+        const fileValidation = receiptFileSchema.safeParse(file);
+        if (!fileValidation.success) {
+          const firstError = fileValidation.error.issues[0];
+          toast({ title: "Грешка във файла", description: firstError.message, variant: "destructive" });
+          return;
+        }
+      }
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "Грешка", description: "Не сте влезли в профила си", variant: "destructive" });
+        return;
+      }
+      
       let receipt_path: string | null = null;
       if (file) {
-        const path = `${Date.now()}_${file.name}`;
+        const path = `${user.id}/${Date.now()}_${file.name}`;
         const { error: upErr } = await supabase.storage.from("receipts").upload(path, file, { upsert: false });
         if (upErr) throw upErr;
         receipt_path = path;
       }
       const { data, error } = await supabase
         .from("expenses")
-        .insert({ amount, incurred_at: date, category_id: categoryId || null, description: description || null, recipient: recipient || null, receipt_path })
+        .insert({ 
+          user_id: user.id,
+          amount, 
+          incurred_at: date, 
+          category_id: categoryId || null, 
+          description: description || null, 
+          recipient: recipient || null, 
+          receipt_path 
+        })
         .select()
         .single();
       if (error) throw error;
@@ -164,7 +196,18 @@ export default function Expenses() {
   // Template functions
   const saveTemplate = async () => {
     try {
-      if (!templateName) return;
+      // Validate template input
+      const validation = templateSchema.safeParse({ 
+        name: templateName, 
+        description: templateDescription, 
+        amount: templateAmount,
+        categoryId: templateCategoryId
+      });
+      if (!validation.success) {
+        const firstError = validation.error.issues[0];
+        toast({ title: "Невалидни данни", description: firstError.message, variant: "destructive" });
+        return;
+      }
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Не сте влезли в профила си");
       
